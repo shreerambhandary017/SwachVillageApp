@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_CONFIG } from '../utils/config';
 import {
   View,
   Text,
@@ -15,33 +16,35 @@ import { getAuthToken } from '../utils/auth';
 // Types for feedback data
 interface Feedback {
   id: number;
-  text: string;
   rating: number;
-  upvotes: number;
+  comment: string;
   created_at: string;
   consumer_name: string;
-  photos: string[];
+  profile_picture?: string;
 }
 
-interface Product {
-  product_id: number;
-  product_name: string;
-  feedback: Feedback[];
+interface FeedbackSummary {
+  total_feedback: number;
   average_rating: number;
-  feedback_count: number;
+  rating_distribution: {
+    '1': number;
+    '2': number;
+    '3': number;
+    '4': number;
+    '5': number;
+  };
 }
 
 interface FeedbackData {
-  overall_rating: number;
-  total_feedback: number;
-  products: Product[];
+  feedback: Feedback[];
+  summary: FeedbackSummary;
 }
 
 export default function FeedbackOverview() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<FeedbackData | null>(null);
   const [error, setError] = useState('');
-  const [activeProduct, setActiveProduct] = useState<number | null>(null);
+  const [selectedRating, setSelectedRating] = useState<number | null>(null);
   const [sortBy, setSortBy] = useState<'rating' | 'date'>('rating');
 
   useEffect(() => {
@@ -58,99 +61,27 @@ export default function FeedbackOverview() {
       }
 
       // Fetch feedback data from API
-      const response = await fetch('http://192.168.1.5:5000/api/business/feedback', {
+      const response = await fetch(`${API_CONFIG.API_URL}/business/feedback`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
 
-      const result = await response.json();
-
       if (!response.ok) {
-        throw new Error(result.message || 'Failed to fetch feedback data');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to fetch feedback data');
       }
 
-      setData(result.data);
-      
-      // Set initial active product to the highest rated one if available
-      if (result.data.products && result.data.products.length > 0) {
-        setActiveProduct(result.data.products[0].product_id);
-      }
+      const result = await response.json();
+      console.log('Feedback data:', result);
+      setData(result);
     } catch (error: any) {
       console.error('Feedback error:', error);
       setError(error.message || 'An error occurred while fetching feedback data');
-      
-      // Use mock data for testing when API fails
-      const mockData = {
-        overall_rating: 4.2,
-        total_feedback: 12,
-        products: [
-          {
-            product_id: 1,
-            product_name: 'Eco-Friendly Hand Soap',
-            feedback: [
-              {
-                id: 1,
-                text: 'Great product, love the natural ingredients!',
-                rating: 5,
-                upvotes: 3,
-                created_at: '2023-08-15T14:30:00Z',
-                consumer_name: 'Jane Doe',
-                photos: []
-              },
-              {
-                id: 2,
-                text: 'Not as foamy as I expected, but still good.',
-                rating: 4,
-                upvotes: 1,
-                created_at: '2023-08-10T09:15:00Z',
-                consumer_name: 'John Smith',
-                photos: []
-              }
-            ],
-            average_rating: 4.5,
-            feedback_count: 2
-          },
-          {
-            product_id: 2,
-            product_name: 'Natural Shampoo',
-            feedback: [
-              {
-                id: 3,
-                text: 'Leaves my hair feeling clean and healthy',
-                rating: 5,
-                upvotes: 2,
-                created_at: '2023-08-12T10:20:00Z',
-                consumer_name: 'Emily Johnson',
-                photos: []
-              }
-            ],
-            average_rating: 5.0,
-            feedback_count: 1
-          }
-        ]
-      };
-      
-      setData(mockData);
-      if (mockData.products && mockData.products.length > 0) {
-        setActiveProduct(mockData.products[0].product_id);
-      }
     } finally {
       setLoading(false);
     }
-  };
-
-  const renderStars = (rating: number) => {
-    return (
-      <View style={styles.starsContainer}>
-        {[1, 2, 3, 4, 5].map((star) => (
-          <Text key={star} style={{ color: star <= rating ? '#f39c12' : '#ddd', fontSize: 18, marginRight: 2 }}>
-            ★
-          </Text>
-        ))}
-      </View>
-    );
   };
 
   const formatDate = (dateString: string) => {
@@ -170,9 +101,15 @@ export default function FeedbackOverview() {
     }
   };
 
-  const getActiveProduct = () => {
-    if (!data || !data.products || data.products.length === 0) return null;
-    return data.products.find(p => p.product_id === activeProduct) || data.products[0];
+  // Filter feedback by rating if a rating filter is selected
+  const getFilteredFeedback = () => {
+    if (!data || !data.feedback) return [];
+    
+    if (selectedRating) {
+      return data.feedback.filter(item => item.rating === selectedRating);
+    }
+    
+    return data.feedback;
   };
 
   if (loading) {
@@ -203,7 +140,7 @@ export default function FeedbackOverview() {
     );
   }
 
-  if (!data || data.products.length === 0) {
+  if (!data || !data.feedback || data.feedback.length === 0) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
@@ -222,7 +159,7 @@ export default function FeedbackOverview() {
     );
   }
 
-  const activeProductData = getActiveProduct();
+  const filteredFeedback = getFilteredFeedback();
 
   return (
     <SafeAreaView style={styles.container}>
@@ -231,129 +168,155 @@ export default function FeedbackOverview() {
         <View style={styles.overallRatingCard}>
           <Text style={styles.overallRatingTitle}>Overall Customer Satisfaction</Text>
           <View style={styles.overallRatingContent}>
-            <Text style={styles.overallRatingValue}>{data.overall_rating.toFixed(1)}</Text>
+            <Text style={styles.overallRatingValue}>{data.summary.average_rating.toFixed(1)}</Text>
             <View style={styles.overallRatingDetails}>
-              {renderStars(data.overall_rating)}
-              <Text style={styles.totalFeedback}>Based on {data.total_feedback} reviews</Text>
+              {renderStars(data.summary.average_rating)}
+              <Text style={styles.totalFeedback}>Based on {data.summary.total_feedback} reviews</Text>
             </View>
           </View>
         </View>
 
-        {/* Product Selection */}
-        <Text style={styles.sectionTitle}>Your Products</Text>
+        {/* Rating Filters */}
+        <Text style={styles.sectionTitle}>Filter by Rating</Text>
         <ScrollView 
           horizontal 
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.productsList}
+          contentContainerStyle={styles.ratingFiltersList}
         >
-          {data.products.map((product) => (
-            <TouchableOpacity
-              key={product.product_id}
+          {/* All ratings option */}
+          <TouchableOpacity
+            style={[
+              styles.ratingFilterCard,
+              selectedRating === null && styles.activeRatingFilter
+            ]}
+            onPress={() => setSelectedRating(null)}
+          >
+            <Text 
               style={[
-                styles.productCard,
-                activeProduct === product.product_id && styles.activeProductCard
+                styles.ratingFilterText,
+                selectedRating === null && styles.activeRatingFilterText
               ]}
-              onPress={() => setActiveProduct(product.product_id)}
             >
-              <Text 
-                style={[
-                  styles.productName,
-                  activeProduct === product.product_id && styles.activeProductName
-                ]}
-                numberOfLines={2}
-              >
-                {product.product_name}
-              </Text>
-              <View style={styles.productRatingContainer}>
-                {renderStars(product.average_rating)}
-                <Text style={styles.productFeedbackCount}>
-                  ({product.feedback_count})
+              All
+            </Text>
+          </TouchableOpacity>
+          
+          {/* Individual star ratings from 5 to 1 */}
+          {[5, 4, 3, 2, 1].map((rating) => (
+            <TouchableOpacity
+              key={rating}
+              style={[
+                styles.ratingFilterCard,
+                selectedRating === rating && styles.activeRatingFilter
+              ]}
+              onPress={() => setSelectedRating(rating)}
+            >
+              <View style={styles.ratingFilterContent}>
+                <Text 
+                  style={[
+                    styles.ratingFilterText,
+                    selectedRating === rating && styles.activeRatingFilterText
+                  ]}
+                >
+                  {rating}
+                </Text>
+                <Text style={styles.ratingFilterStar}>★</Text>
+                <Text 
+                  style={[
+                    styles.ratingCount,
+                    selectedRating === rating && styles.activeRatingFilterText
+                  ]}
+                >
+                  ({data.summary.rating_distribution[rating as 1 | 2 | 3 | 4 | 5]})
                 </Text>
               </View>
             </TouchableOpacity>
           ))}
         </ScrollView>
 
-        {/* Feedback for Selected Product */}
-        {activeProductData && (
-          <View style={styles.feedbackSection}>
-            <View style={styles.feedbackHeader}>
-              <Text style={styles.feedbackTitle}>
-                Customer Feedback for {activeProductData.product_name}
-              </Text>
-              <View style={styles.sortOptions}>
-                <Text style={styles.sortLabel}>Sort by:</Text>
-                <TouchableOpacity
-                  style={[
-                    styles.sortButton,
-                    sortBy === 'rating' && styles.activeSortButton
-                  ]}
-                  onPress={() => setSortBy('rating')}
-                >
-                  <Text style={styles.sortButtonText}>Rating</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.sortButton,
-                    sortBy === 'date' && styles.activeSortButton
-                  ]}
-                  onPress={() => setSortBy('date')}
-                >
-                  <Text style={styles.sortButtonText}>Date</Text>
-                </TouchableOpacity>
-              </View>
+        {/* All Feedback */}
+        <View style={styles.feedbackSection}>
+          <View style={styles.feedbackHeader}>
+            <Text style={styles.feedbackTitle}>
+              Customer Feedback
+              {selectedRating ? ` (${selectedRating} Star${selectedRating !== 1 ? 's' : ''})` : ''}
+            </Text>
+            <View style={styles.sortOptions}>
+              <Text style={styles.sortLabel}>Sort by:</Text>
+              <TouchableOpacity
+                style={[
+                  styles.sortButton,
+                  sortBy === 'rating' && styles.activeSortButton
+                ]}
+                onPress={() => setSortBy('rating')}
+              >
+                <Text style={styles.sortButtonText}>Rating</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.sortButton,
+                  sortBy === 'date' && styles.activeSortButton
+                ]}
+                onPress={() => setSortBy('date')}
+              >
+                <Text style={styles.sortButtonText}>Date</Text>
+              </TouchableOpacity>
             </View>
+          </View>
 
-            {activeProductData.feedback.length === 0 ? (
-              <View style={styles.noFeedbackContainer}>
-                <Text style={styles.noFeedbackText}>
-                  No feedback for this product yet.
-                </Text>
-              </View>
-            ) : (
-              sortFeedback(activeProductData.feedback).map((feedback) => (
-                <View key={feedback.id} style={styles.feedbackItem}>
-                  <View style={styles.feedbackItemHeader}>
-                    <View style={styles.userInfo}>
-                      <Text style={styles.userName}>{feedback.consumer_name}</Text>
-                      <Text style={styles.feedbackDate}>{formatDate(feedback.created_at)}</Text>
-                    </View>
-                    <View style={styles.feedbackRating}>
-                      {renderStars(feedback.rating)}
-                    </View>
+          {filteredFeedback.length === 0 ? (
+            <View style={styles.noFeedbackContainer}>
+              <Text style={styles.noFeedbackText}>
+                No feedback available with the selected filter.
+              </Text>
+            </View>
+          ) : (
+            sortFeedback(filteredFeedback).map((feedback) => (
+              <View key={feedback.id} style={styles.feedbackItem}>
+                <View style={styles.feedbackItemHeader}>
+                  <View style={styles.userInfo}>
+                    <Text style={styles.userName}>{feedback.consumer_name}</Text>
+                    <Text style={styles.feedbackDate}>{formatDate(feedback.created_at)}</Text>
                   </View>
-                  <Text style={styles.feedbackText}>{feedback.text}</Text>
-                  
-                  {feedback.photos && feedback.photos.length > 0 && (
-                    <ScrollView 
-                      horizontal 
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={styles.photosList}
-                    >
-                      {feedback.photos.map((photo, index) => (
-                        <View key={index} style={styles.photoContainer}>
-                          <Image 
-                            source={{ uri: photo }} 
-                            style={styles.photo}
-                            resizeMode="cover"
-                          />
-                        </View>
-                      ))}
-                    </ScrollView>
-                  )}
-                  
-                  <View style={styles.feedbackFooter}>
-                    <Text style={styles.upvotes}>👍 {feedback.upvotes} helpful</Text>
+                  <View style={styles.feedbackRating}>
+                    {renderStars(feedback.rating)}
                   </View>
                 </View>
-              ))
-            )}
-          </View>
-        )}
+                <Text style={styles.feedbackText}>{feedback.comment}</Text>
+                
+                {feedback.profile_picture && (
+                  <View style={styles.userImageContainer}>
+                    <Image 
+                      source={{ uri: feedback.profile_picture }} 
+                      style={styles.userImage}
+                      resizeMode="cover"
+                    />
+                  </View>
+                )}
+                
+                <View style={styles.feedbackFooter}>
+                  <Text style={styles.feedbackMetadata}>Feedback ID: #{feedback.id}</Text>
+                </View>
+              </View>
+            ))
+          )}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
+
+const renderStars = (rating: number) => {
+  return (
+    <View style={styles.starsContainer}>
+      {[1, 2, 3, 4, 5].map((star) => (
+        <Text key={star} style={{ color: star <= rating ? '#f39c12' : '#ddd', fontSize: 18, marginRight: 2 }}>
+          ★
+        </Text>
+      ))}
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -448,42 +411,49 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     color: '#333',
   },
-  productsList: {
-    paddingVertical: 8,
+  ratingFiltersList: {
+    paddingVertical: 10,
   },
-  productCard: {
+  ratingFilterCard: {
     backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 12,
-    marginRight: 12,
-    width: 160,
+    borderRadius: 10,
+    padding: 10,
+    marginRight: 10,
+    minWidth: 80,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
-    elevation: 1,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+    alignItems: 'center',
   },
-  activeProductCard: {
+  activeRatingFilter: {
+    borderColor: '#f39c12',
     backgroundColor: '#f39c12',
   },
-  productName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-    height: 40,
-  },
-  activeProductName: {
-    color: '#fff',
-  },
-  productRatingContainer: {
+  ratingFilterContent: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  productFeedbackCount: {
-    fontSize: 14,
-    color: '#888',
+  ratingFilterText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  activeRatingFilterText: {
+    color: '#fff',
+  },
+  ratingFilterStar: {
+    color: '#f39c12',
+    fontSize: 18,
+    marginLeft: 3,
+  },
+  ratingCount: {
     marginLeft: 5,
+    fontSize: 14,
+    color: '#666',
   },
   feedbackSection: {
     marginTop: 20,
@@ -593,6 +563,20 @@ const styles = StyleSheet.create({
   },
   upvotes: {
     fontSize: 14,
+    color: '#888',
+  },
+  userImageContainer: {
+    marginTop: 5,
+    marginBottom: 10,
+    borderRadius: 6,
+    overflow: 'hidden',
+  },
+  userImage: {
+    width: '100%',
+    height: 200,
+  },
+  feedbackMetadata: {
+    fontSize: 12,
     color: '#888',
   },
 }); 

@@ -1,45 +1,52 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Image, FlatList, ActivityIndicator } from 'react-native';
-import { useRouter } from 'expo-router';
+import { View, Text, StyleSheet, SafeAreaView, FlatList, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../utils/ThemeContext';
 import { API_CONFIG } from '../utils/config';
+import { getUserData } from '../utils/auth';
 
-// Business type definition
-type Business = {
+// Feedback type definition
+type Feedback = {
   id: number;
   business_name: string;
-  description: string;
-  certification_status: string;
   rating: number;
-  logo_url?: string;
+  comment: string;
+  created_at: string;
 };
 
-export default function ConsumerDashboard() {
-  const router = useRouter();
-  const { colors, theme } = useTheme();
-  const [businesses, setBusinesses] = useState<Business[]>([]);
+export default function FeedbackScreen() {
+  const { colors } = useTheme();
+  const [feedback, setFeedback] = useState<Feedback[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    fetchBusinesses();
+    fetchFeedback();
   }, []);
 
-  const fetchBusinesses = async () => {
+  const fetchFeedback = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_CONFIG.API_URL}/businesses/certified`);
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch businesses');
+      
+      // Get the current user data
+      const userData = await getUserData();
+      
+      if (!userData || !userData.id) {
+        throw new Error('User information not found');
       }
-
+      
+      // Fetch feedback for the current user
+      const response = await fetch(`${API_CONFIG.API_URL}/consumer/feedback?user_id=${userData.id}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch feedback');
+      }
+      
       const data = await response.json();
-      setBusinesses(data.businesses || []);
+      setFeedback(data.feedback || []);
     } catch (error) {
-      console.error('Error fetching businesses:', error);
-      setError('Unable to load businesses. Please try again later.');
+      console.error('Error fetching feedback:', error);
+      setError('Unable to load feedback. Please try again later.');
     } finally {
       setLoading(false);
     }
@@ -50,21 +57,21 @@ export default function ConsumerDashboard() {
     const stars = [];
     const fullStars = Math.floor(rating);
     const hasHalfStar = rating % 1 >= 0.5;
-
+    
     // Add full stars
     for (let i = 0; i < fullStars; i++) {
       stars.push(
         <Ionicons key={`full-${i}`} name="star" size={16} color={colors.primary} style={styles.starIcon} />
       );
     }
-
+    
     // Add half star if needed
     if (hasHalfStar) {
       stars.push(
         <Ionicons key="half" name="star-half" size={16} color={colors.primary} style={styles.starIcon} />
       );
     }
-
+    
     // Add empty stars
     const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
     for (let i = 0; i < emptyStars; i++) {
@@ -72,45 +79,51 @@ export default function ConsumerDashboard() {
         <Ionicons key={`empty-${i}`} name="star-outline" size={16} color={colors.primary} style={styles.starIcon} />
       );
     }
-
+    
     return stars;
   };
 
-  const renderBusinessItem = ({ item }: { item: Business }) => (
-    <View style={[styles.businessCard, { backgroundColor: colors.surface }]}>
-      <View style={styles.businessLogoContainer}>
-        {item.logo_url ? (
-          <Image source={{ uri: item.logo_url }} style={styles.businessLogo} />
-        ) : (
-          <View style={[styles.businessLogoPlaceholder, { backgroundColor: colors.primary }]}>
-            <Ionicons name="business-outline" size={24} color="white" />
-          </View>
-        )}
-      </View>
-      <View style={styles.businessInfo}>
+  // Format date
+  const formatDate = (dateString: string) => {
+    const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: 'numeric' };
+    return new Date(dateString).toLocaleDateString(undefined, options);
+  };
+
+  const renderFeedbackItem = ({ item }: { item: Feedback }) => (
+    <View style={[styles.feedbackCard, { backgroundColor: colors.surface }]}>
+      <View style={styles.feedbackHeader}>
         <Text style={[styles.businessName, { color: colors.text }]}>{item.business_name}</Text>
-        <Text style={[styles.businessDescription, { color: colors.textSecondary }]} numberOfLines={2}>
-          {item.description || 'Certified clean and cruelty-free business'}
+        <Text style={[styles.feedbackDate, { color: colors.textSecondary }]}>
+          {formatDate(item.created_at)}
         </Text>
-        <View style={styles.ratingContainer}>
-          {renderRatingStars(item.rating)}
-          <Text style={[styles.ratingText, { color: colors.textSecondary }]}>({item.rating.toFixed(1)})</Text>
-        </View>
       </View>
+      
+      <View style={styles.ratingContainer}>
+        {renderRatingStars(item.rating)}
+        <Text style={[styles.ratingText, { color: colors.textSecondary }]}>({item.rating.toFixed(1)})</Text>
+      </View>
+      
+      <Text style={[styles.feedbackComment, { color: colors.text }]}>
+        {item.comment || 'No comment provided'}
+      </Text>
     </View>
   );
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>Swach Village</Text>
-        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Certified Businesses</Text>
+        <Text style={[styles.title, { color: colors.text }]}>Your Feedback</Text>
+        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+          Reviews you've submitted
+        </Text>
       </View>
-
+      
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading businesses...</Text>
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+            Loading your feedback...
+          </Text>
         </View>
       ) : error ? (
         <View style={styles.errorContainer}>
@@ -118,33 +131,28 @@ export default function ConsumerDashboard() {
           <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
           <TouchableOpacity
             style={[styles.retryButton, { backgroundColor: colors.primary }]}
-            onPress={fetchBusinesses}
+            onPress={fetchFeedback}
           >
             <Text style={styles.retryButtonText}>Try Again</Text>
           </TouchableOpacity>
         </View>
-      ) : businesses.length === 0 ? (
+      ) : feedback.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="business-outline" size={40} color={colors.textSecondary} />
-          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No certified businesses found</Text>
+          <Ionicons name="chatbubble-outline" size={40} color={colors.textSecondary} />
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+            You haven't provided any feedback yet
+          </Text>
+          <Text style={[styles.emptySubText, { color: colors.textSecondary }]}>
+            Your reviews of businesses will appear here
+          </Text>
         </View>
       ) : (
         <FlatList
-          data={businesses}
-          renderItem={renderBusinessItem}
+          data={feedback}
+          renderItem={renderFeedbackItem}
           keyExtractor={(item) => item.id.toString()}
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
-          ListHeaderComponent={
-            <View style={styles.listHeader}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                Certified Businesses
-              </Text>
-              <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
-                These businesses have been verified as clean and cruelty-free
-              </Text>
-            </View>
-          }
         />
       )}
     </SafeAreaView>
@@ -211,25 +219,19 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 16,
     textAlign: 'center',
+    fontWeight: '500',
+  },
+  emptySubText: {
+    marginTop: 5,
+    fontSize: 14,
+    textAlign: 'center',
+    opacity: 0.8,
   },
   listContainer: {
     padding: 16,
     paddingTop: 0,
   },
-  listHeader: {
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  sectionSubtitle: {
-    fontSize: 14,
-    marginBottom: 16,
-  },
-  businessCard: {
-    flexDirection: 'row',
+  feedbackCard: {
     borderRadius: 12,
     marginBottom: 16,
     padding: 16,
@@ -239,37 +241,23 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 2,
   },
-  businessLogoContainer: {
-    marginRight: 16,
-  },
-  businessLogo: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-  },
-  businessLogoPlaceholder: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    justifyContent: 'center',
+  feedbackHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  businessInfo: {
-    flex: 1,
-    justifyContent: 'center',
+    marginBottom: 8,
   },
   businessName: {
     fontSize: 18,
     fontWeight: '600',
-    marginBottom: 4,
   },
-  businessDescription: {
-    fontSize: 14,
-    marginBottom: 6,
+  feedbackDate: {
+    fontSize: 12,
   },
   ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 12,
   },
   starIcon: {
     marginRight: 2,
@@ -277,5 +265,9 @@ const styles = StyleSheet.create({
   ratingText: {
     fontSize: 14,
     marginLeft: 4,
+  },
+  feedbackComment: {
+    fontSize: 14,
+    lineHeight: 20,
   },
 });

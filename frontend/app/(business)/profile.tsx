@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_CONFIG } from '../utils/config';
 import {
   View,
   Text,
@@ -59,7 +60,7 @@ export default function BusinessProfile() {
       }
 
       // Fetch profile data from API
-      const response = await fetch('http://192.168.1.5:5000/api/business/profile', {
+      const response = await fetch(`${API_CONFIG.API_URL}/business/profile`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_CONFIG } from '../utils/config';
 import { 
   View, 
   Text, 
@@ -67,7 +68,7 @@ export default function ProductDetailsScreen() {
         throw new Error('Authentication token not found');
       }
       
-      const response = await fetch(`http://192.168.1.5:5000/api/products/details?product_code=${productCode}`, {
+      const response = await fetch(`${API_CONFIG.API_URL}/products/details?product_code=${productCode}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -95,7 +96,7 @@ export default function ProductDetailsScreen() {
         throw new Error('Authentication token not found');
       }
       
-      const response = await fetch(`http://192.168.1.5:5000/api/feedback/upvote/${feedbackId}`, {
+      const response = await fetch(`${API_CONFIG.API_URL}/feedback/upvote/${feedbackId}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -162,7 +163,7 @@ export default function ProductDetailsScreen() {
         photos: JSON.stringify(feedbackPhotos)
       };
       
-      const response = await fetch('http://192.168.1.5:5000/api/feedback/submit', {
+      const response = await fetch(`${API_CONFIG.API_URL}/feedback/submit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

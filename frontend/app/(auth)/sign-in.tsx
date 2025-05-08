@@ -3,20 +3,24 @@ import {
   View, 
   Text, 
   StyleSheet, 
-  SafeAreaView, 
-  TextInput, 
-  TouchableOpacity, 
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
+  TouchableOpacity,
   Platform,
-  ScrollView
+  SafeAreaView,
+  KeyboardAvoidingView,
+  ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { loginUser, UserRole } from '../utils/auth';
+import { useTheme } from '../utils/ThemeContext';
+import ThemeSwitch from '../components/ThemeSwitch';
+import { THEME_SIZING } from '../utils/theme';
+import { TextInput, ActivityIndicator } from 'react-native';
 
 export default function SignInScreen() {
   const router = useRouter();
+  const { colors, theme } = useTheme();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<UserRole>('consumer');
@@ -60,93 +64,127 @@ export default function SignInScreen() {
       >
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.content}>
-            <Text style={styles.title}>Sign In</Text>
-            <Text style={styles.subtitle}>Welcome to Swach Village</Text>
-            
-            {error ? <Text style={styles.errorText}>{error}</Text> : null}
-            
-            <View style={styles.form}>
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Email / Phone</Text>
-                <TextInput
-                  style={styles.input}
-                  value={identifier}
-                  onChangeText={setIdentifier}
-                  placeholder="Enter your email or phone"
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                />
-              </View>
-              
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Password</Text>
-                <TextInput
-                  style={styles.input}
-                  value={password}
-                  onChangeText={setPassword}
-                  placeholder="Enter your password"
-                  secureTextEntry
-                />
-              </View>
-              
-              <View style={styles.roleToggleContainer}>
-                <Text style={styles.label}>I am a:</Text>
-                <View style={styles.toggleButtons}>
-                  <TouchableOpacity
-                    style={[
-                      styles.roleButton,
-                      role === 'business' && styles.activeRoleButton
-                    ]}
-                    onPress={() => setRole('business')}
-                  >
-                    <Text 
-                      style={[
-                        styles.roleButtonText, 
-                        role === 'business' && styles.activeRoleButtonText
-                      ]}
-                    >
-                      Business
-                    </Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity
-                    style={[
-                      styles.roleButton,
-                      role === 'consumer' && styles.activeRoleButton
-                    ]}
-                    onPress={() => setRole('consumer')}
-                  >
-                    <Text 
-                      style={[
-                        styles.roleButtonText, 
-                        role === 'consumer' && styles.activeRoleButtonText
-                      ]}
-                    >
-                      Consumer
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-              
-              <TouchableOpacity 
-                style={styles.signInButton} 
-                onPress={handleSignIn}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.signInButtonText}>Sign In</Text>
-                )}
-              </TouchableOpacity>
-              
-              <View style={styles.signUpContainer}>
-                <Text style={styles.signUpText}>Don't have an account? </Text>
-                <TouchableOpacity onPress={() => router.push('/(auth)/sign-up')}>
-                  <Text style={styles.signUpLink}>Sign Up</Text>
-                </TouchableOpacity>
-              </View>
+            <View style={styles.themeSwitch}>
+              <ThemeSwitch />
             </View>
+      <View style={styles.headerContainer}>
+        <View style={[styles.logoContainer, { backgroundColor: colors.primary }]}>
+          <Image
+            source={require('../../assets/images/swach_logo.png')}
+            style={styles.logo}
+            contentFit="contain"
+          />
+        </View>
+        <Text style={[styles.title, { color: colors.text }]}>Sign In</Text>
+        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+          Welcome to Swach Village
+        </Text>
+      </View>
+      
+      <View style={styles.form}>
+        {error ? (
+          <Text style={styles.errorText}>{error}</Text>
+        ) : null}
+        
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Email / Phone</Text>
+          <View style={styles.inputWrapper}>
+            <Ionicons name="mail-outline" size={20} color={colors.textSecondary} style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              value={identifier}
+              onChangeText={setIdentifier}
+              placeholder="Enter your email or phone"
+              autoCapitalize="none"
+              keyboardType="email-address"
+            />
+          </View>
+        </View>
+        
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Password</Text>
+          <View style={styles.inputWrapper}>
+            <Ionicons name="lock-closed-outline" size={20} color={colors.textSecondary} style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              value={password}
+              onChangeText={setPassword}
+              placeholder="Enter your password"
+              secureTextEntry
+            />
+          </View>
+        </View>
+        
+        <Text style={[styles.sectionLabel, { color: colors.text }]}>I am a:</Text>
+        <View style={styles.roleToggleContainer}>
+          <TouchableOpacity
+            style={[
+              styles.roleButton,
+              { borderColor: colors.border },
+              role === 'business' && { backgroundColor: colors.primary, borderColor: colors.primary }
+            ]}
+            onPress={() => setRole('business')}
+          >
+            <Ionicons 
+              name="business-outline" 
+              size={20} 
+              color={role === 'business' ? 'white' : colors.textSecondary} 
+            />
+            <Text 
+              style={[
+                styles.roleButtonText,
+                { color: colors.text },
+                role === 'business' && { color: 'white' }
+              ]}
+            >
+              Business
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[
+              styles.roleButton,
+              { borderColor: colors.border },
+              role === 'consumer' && { backgroundColor: colors.primary, borderColor: colors.primary }
+            ]}
+            onPress={() => setRole('consumer')}
+          >
+            <Ionicons 
+              name="person-outline" 
+              size={20} 
+              color={role === 'consumer' ? 'white' : colors.textSecondary} 
+            />
+            <Text 
+              style={[
+                styles.roleButtonText,
+                { color: colors.text },
+                role === 'consumer' && { color: 'white' }
+              ]}
+            >
+              Consumer
+            </Text>
+          </TouchableOpacity>
+        </View>
+        
+        <TouchableOpacity 
+          style={styles.signInButton} 
+          onPress={handleSignIn}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.signInButtonText}>Sign In</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+      
+      <View style={styles.signUpContainer}>
+        <Text style={[styles.signUpText, { color: colors.textSecondary }]}>Don't have an account? </Text>
+        <TouchableOpacity onPress={() => router.push('/(auth)/sign-up')}>
+          <Text style={[styles.signUpLink, { color: colors.primary }]}>Sign Up</Text>
+        </TouchableOpacity>
+      </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -164,11 +202,46 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
+    paddingBottom: 30,
   },
   content: {
     flex: 1,
     padding: 20,
+  },
+  themeSwitch: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    zIndex: 10,
+  },
+  headerContainer: {
+    alignItems: 'center',
+    marginTop: THEME_SIZING.spacing.xl,
+    marginBottom: THEME_SIZING.spacing.l,
+  },
+  logoContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#FF7B00',
     justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
+  },
+  logo: {
+    width: 80,
+    height: 80,
   },
   title: {
     fontSize: 30,
@@ -185,6 +258,15 @@ const styles = StyleSheet.create({
   },
   form: {
     width: '100%',
+    marginBottom: 25,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 2,
   },
   inputContainer: {
     marginBottom: 20,
@@ -195,45 +277,60 @@ const styles = StyleSheet.create({
     color: '#333',
     fontWeight: '500',
   },
-  input: {
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#fff',
     borderRadius: 8,
-    padding: 15,
-    fontSize: 16,
     borderWidth: 1,
     borderColor: '#ddd',
   },
-  roleToggleContainer: {
-    marginBottom: 25,
+  inputIcon: {
+    padding: 15,
   },
-  toggleButtons: {
+  input: {
+    flex: 1,
+    padding: 15,
+    fontSize: 16,
+  },
+  errorContainer: {
+    marginBottom: 15,
+    padding: 15,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 0, 0, 0.1)',
+  },
+  errorText: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  sectionLabel: {
+    fontSize: THEME_SIZING.fontSize.s,
+    fontWeight: '500',
+    marginBottom: THEME_SIZING.spacing.s,
+    marginTop: THEME_SIZING.spacing.m,
+  },
+  roleToggleContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginBottom: THEME_SIZING.spacing.l,
   },
   roleButton: {
     flex: 1,
-    padding: 15,
+    flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#eee',
-    marginHorizontal: 5,
-    borderRadius: 8,
+    justifyContent: 'center',
+    padding: THEME_SIZING.spacing.m,
+    borderRadius: THEME_SIZING.borderRadius.medium,
     borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  activeRoleButton: {
-    backgroundColor: '#3498db',
-    borderColor: '#3498db',
+    marginHorizontal: THEME_SIZING.spacing.xs,
   },
   roleButtonText: {
-    fontSize: 16,
+    fontSize: THEME_SIZING.fontSize.m,
     fontWeight: '500',
-    color: '#666',
-  },
-  activeRoleButtonText: {
-    color: '#fff',
+    marginLeft: THEME_SIZING.spacing.xs,
   },
   signInButton: {
-    backgroundColor: '#3498db',
+    backgroundColor: '#FF7B00',
     borderRadius: 8,
     padding: 15,
     alignItems: 'center',
@@ -247,21 +344,14 @@ const styles = StyleSheet.create({
   signUpContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: 20,
+    marginTop: THEME_SIZING.spacing.xl,
+    marginBottom: THEME_SIZING.spacing.xl,
   },
   signUpText: {
-    color: '#666',
-    fontSize: 16,
+    fontSize: THEME_SIZING.fontSize.m,
   },
   signUpLink: {
-    color: '#3498db',
-    fontSize: 16,
+    fontSize: THEME_SIZING.fontSize.m,
     fontWeight: '600',
   },
-  errorText: {
-    color: '#e74c3c',
-    textAlign: 'center',
-    marginBottom: 15,
-    fontSize: 16,
-  },
-}); 
+});

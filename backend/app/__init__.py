@@ -1,5 +1,5 @@
 import os
-from flask import Flask
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
 
@@ -8,7 +8,20 @@ load_dotenv()
 
 def create_app():
     app = Flask(__name__)
+    
+    # Enable CORS for all routes
     CORS(app)
+    
+    # Add explicit CORS handling for preflight requests
+    @app.before_request
+    def handle_preflight():
+        if request.method == 'OPTIONS':
+            response = jsonify({'status': 'ok'})
+            response.headers.add('Access-Control-Allow-Origin', '*')
+            response.headers.add('Access-Control-Allow-Headers', '*')
+            response.headers.add('Access-Control-Allow-Methods', '*')
+            response.headers.add('Access-Control-Max-Age', '3600')
+            return response, 200
     
     # Configure the app
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev_key')

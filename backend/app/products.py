@@ -1,5 +1,6 @@
 import os
 from flask import Blueprint, request, jsonify
+from datetime import datetime
 from .database import get_db_connection
 from .auth_middleware import token_required
 
@@ -43,6 +44,66 @@ def verify_product(user_id, role):
         
     except Exception as e:
         return jsonify({'message': f'Error: {str(e)}'}), 500
+    finally:
+        if 'cursor' in locals() and cursor:
+            cursor.close()
+        if 'conn' in locals() and conn:
+            conn.close()
+
+@products_bp.route('/verify', methods=['GET'])
+def verify_product_by_code():
+    """Verify a product using its code (used by the new consumer interface)"""
+    product_code = request.args.get('code')
+    
+    if not product_code:
+        return jsonify({
+            'success': False,
+            'message': 'No product code provided'
+        }), 400
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        
+        # Get product details including business information
+        query = """
+        SELECT p.*, b.business_name, b.certification_status, 
+               DATE_FORMAT(b.certified_date, '%Y-%m-%d') as certified_date
+        FROM products p
+        JOIN businesses b ON p.business_id = b.id
+        WHERE p.product_code = %s
+        """
+        
+        cursor.execute(query, (product_code,))
+        product = cursor.fetchone()
+        
+        if not product:
+            return jsonify({
+                'success': False,
+                'message': 'Product not found'
+            }), 404
+        
+        # Save verification record
+        now = datetime.now()
+        verification_query = """
+        INSERT INTO product_verifications 
+        (product_id, verification_date, verification_method)
+        VALUES (%s, %s, 'manual_code')
+        """
+        
+        cursor.execute(verification_query, (product['id'], now))
+        conn.commit()
+        
+        return jsonify({
+            'success': True,
+            'product': product
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False, 
+            'message': f'Error verifying product: {str(e)}'
+        }), 500
     finally:
         if 'cursor' in locals() and cursor:
             cursor.close()

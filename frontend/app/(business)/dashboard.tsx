@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { API_CONFIG } from '../utils/config';
+import { useTheme } from '../utils/ThemeContext';
 import {
   View,
   Text,
@@ -14,25 +16,44 @@ import { useRouter } from 'expo-router';
 import { getAuthToken } from '../utils/auth';
 
 // Types for dashboard data
-interface DashboardData {
+interface DashboardStats {
   business_name: string;
-  application_status: 'pending' | 'approved' | 'rejected';
+  certification_status: string;
+  cleanliness_rating: number;
+  total_scans: number;
+  total_feedback: number;
+  average_rating: number;
+}
+
+interface DashboardProgress {
+  business_details: boolean;
+  owner_details: boolean;
+  vendor_compliance: boolean;
+  cleanliness: boolean;
+  cruelty_free: boolean;
+}
+
+interface ActivityItem {
+  id: string;
+  type: string;
+  product_name?: string;
+  rating?: number;
+  comment?: string;
+  consumer_name: string;
+  timestamp: string;
+}
+
+interface DashboardData {
+  stats: DashboardStats;
+  progress: DashboardProgress;
   completion_percentage: number;
-  sections: {
-    business_details: boolean;
-    owner_details: boolean;
-    vendor_compliance: boolean;
-    cleanliness_hygiene: boolean;
-    cruelty_free: boolean;
-    sustainability: boolean;
-  };
-  document_uploads: number;
-  audit_required: boolean;
-  last_updated: string;
+  recent_activity: ActivityItem[];
+  certification_complete: boolean;
 }
 
 export default function BusinessDashboard() {
   const router = useRouter();
+  const { colors, theme } = useTheme();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState('');
@@ -52,41 +73,24 @@ export default function BusinessDashboard() {
       }
 
       // Fetch dashboard data from API
-      const response = await fetch('http://192.168.1.5:5000/api/business/dashboard', {
+      const response = await fetch(`${API_CONFIG.API_URL}/business/dashboard`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       });
 
-      const result = await response.json();
-
       if (!response.ok) {
-        throw new Error(result.message || 'Failed to fetch dashboard data');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to fetch dashboard data');
       }
 
-      setData(result.data);
+      const result = await response.json();
+      console.log('Dashboard data:', result);
+      setData(result);
     } catch (error: any) {
       console.error('Dashboard error:', error);
       setError(error.message || 'An error occurred while fetching dashboard data');
-      
-      // Use mock data for testing when API fails
-      setData({
-        business_name: 'Eco-Friendly Products Ltd.',
-        application_status: 'pending',
-        completion_percentage: 75,
-        sections: {
-          business_details: true,
-          owner_details: true,
-          vendor_compliance: true,
-          cleanliness_hygiene: false,
-          cruelty_free: true,
-          sustainability: false,
-        },
-        document_uploads: 4,
-        audit_required: true,
-        last_updated: '2023-07-15T10:30:00Z',
-      });
     } finally {
       setLoading(false);
     }
@@ -96,24 +100,46 @@ export default function BusinessDashboard() {
     router.push('/certification');
   };
 
-  // Status badge color based on application status
+  // Status badge color based on certification status
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'approved':
-        return '#27ae60'; // Green
+        return theme === 'dark' ? '#2ecc71' : '#27ae60'; // Green
       case 'rejected':
-        return '#e74c3c'; // Red
+        return theme === 'dark' ? '#e74c3c' : '#c0392b'; // Red
+      case 'pending':
+        return theme === 'dark' ? '#f39c12' : '#e67e22'; // Orange/Amber for pending
+      case 'under_review':
+        return theme === 'dark' ? '#3498db' : '#2980b9'; // Blue for under review
       default:
-        return '#f39c12'; // Orange/Amber for pending
+        return theme === 'dark' ? '#95a5a6' : '#7f8c8d'; // Gray for not submitted or other statuses
+    }
+  };
+
+  // Format certification status for display
+  const formatStatus = (status: string) => {
+    switch (status) {
+      case 'approved':
+        return 'Approved';
+      case 'rejected':
+        return 'Rejected';
+      case 'pending':
+        return 'Pending';
+      case 'under_review':
+        return 'Under Review';
+      case 'not_submitted':
+        return 'Not Submitted';
+      default:
+        return status.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
     }
   };
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#f39c12" />
-          <Text style={styles.loadingText}>Loading dashboard...</Text>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.text }]}>Loading dashboard...</Text>
         </View>
       </SafeAreaView>
     );
@@ -121,12 +147,12 @@ export default function BusinessDashboard() {
 
   if (error && !data) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.errorContainer}>
-          <Text style={styles.errorTitle}>Error</Text>
-          <Text style={styles.errorText}>{error}</Text>
+          <Text style={[styles.errorTitle, { color: theme === 'dark' ? '#e74c3c' : '#c0392b' }]}>Error</Text>
+          <Text style={[styles.errorText, { color: colors.text }]}>{error}</Text>
           <TouchableOpacity
-            style={styles.refreshButton}
+            style={[styles.refreshButton, { backgroundColor: colors.primary }]}
             onPress={fetchDashboardData}
           >
             <Text style={styles.refreshButtonText}>Refresh</Text>
@@ -138,14 +164,14 @@ export default function BusinessDashboard() {
 
   if (!data) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.errorContainer}>
-          <Text style={styles.errorTitle}>No Data Available</Text>
-          <Text style={styles.errorText}>
+          <Text style={[styles.errorTitle, { color: colors.text }]}>No Data Available</Text>
+          <Text style={[styles.errorText, { color: colors.text }]}>
             We couldn't find any dashboard data for your business.
           </Text>
           <TouchableOpacity
-            style={styles.refreshButton}
+            style={[styles.refreshButton, { backgroundColor: colors.primary }]}
             onPress={fetchDashboardData}
           >
             <Text style={styles.refreshButtonText}>Refresh</Text>
@@ -156,21 +182,52 @@ export default function BusinessDashboard() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Business Dashboard</Text>
-          <Text style={styles.subtitle}>{data.business_name}</Text>
+          <Text style={styles.subtitle}>{data.stats.business_name}</Text>
           <View
             style={[
               styles.statusBadge,
-              { backgroundColor: getStatusColor(data.application_status) },
+              { backgroundColor: getStatusColor(data.stats.certification_status) },
             ]}
           >
             <Text style={styles.statusText}>
-              {data.application_status.charAt(0).toUpperCase() + data.application_status.slice(1)}
+              {formatStatus(data.stats.certification_status)}
             </Text>
+          </View>
+        </View>
+
+        {/* Business Statistics */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Business Statistics</Text>
+          <View style={styles.infoContainer}>
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>Total Scans:</Text>
+              <Text style={styles.infoValue}>
+                {data.stats.total_scans}
+              </Text>
+            </View>
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>Total Feedback:</Text>
+              <Text style={styles.infoValue}>
+                {data.stats.total_feedback}
+              </Text>
+            </View>
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>Average Rating:</Text>
+              <Text style={styles.infoValue}>
+                {data.stats.average_rating ? data.stats.average_rating.toFixed(1) : '0.0'} / 5.0
+              </Text>
+            </View>
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>Cleanliness Rating:</Text>
+              <Text style={styles.infoValue}>
+                {data.stats.cleanliness_rating || 0} / 5
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -186,7 +243,7 @@ export default function BusinessDashboard() {
             />
           </View>
           <Text style={styles.progressText}>
-            {data.completion_percentage}% Complete
+            {Math.round(data.completion_percentage)}% Complete
           </Text>
         </View>
 
@@ -199,14 +256,14 @@ export default function BusinessDashboard() {
                 style={[
                   styles.checkIcon,
                   {
-                    backgroundColor: data.sections.business_details
+                    backgroundColor: data.progress.business_details
                       ? '#27ae60'
                       : '#e74c3c',
                   },
                 ]}
               >
                 <Text style={styles.checkIconText}>
-                  {data.sections.business_details ? '✓' : '✗'}
+                  {data.progress.business_details ? '✓' : '✗'}
                 </Text>
               </View>
               <Text style={styles.checklistText}>Business Details</Text>
@@ -217,14 +274,14 @@ export default function BusinessDashboard() {
                 style={[
                   styles.checkIcon,
                   {
-                    backgroundColor: data.sections.owner_details
+                    backgroundColor: data.progress.owner_details
                       ? '#27ae60'
                       : '#e74c3c',
                   },
                 ]}
               >
                 <Text style={styles.checkIconText}>
-                  {data.sections.owner_details ? '✓' : '✗'}
+                  {data.progress.owner_details ? '✓' : '✗'}
                 </Text>
               </View>
               <Text style={styles.checklistText}>Owner Details</Text>
@@ -235,14 +292,14 @@ export default function BusinessDashboard() {
                 style={[
                   styles.checkIcon,
                   {
-                    backgroundColor: data.sections.vendor_compliance
+                    backgroundColor: data.progress.vendor_compliance
                       ? '#27ae60'
                       : '#e74c3c',
                   },
                 ]}
               >
                 <Text style={styles.checkIconText}>
-                  {data.sections.vendor_compliance ? '✓' : '✗'}
+                  {data.progress.vendor_compliance ? '✓' : '✗'}
                 </Text>
               </View>
               <Text style={styles.checklistText}>Vendor Compliance</Text>
@@ -253,14 +310,14 @@ export default function BusinessDashboard() {
                 style={[
                   styles.checkIcon,
                   {
-                    backgroundColor: data.sections.cleanliness_hygiene
+                    backgroundColor: data.progress.cleanliness
                       ? '#27ae60'
                       : '#e74c3c',
                   },
                 ]}
               >
                 <Text style={styles.checkIconText}>
-                  {data.sections.cleanliness_hygiene ? '✓' : '✗'}
+                  {data.progress.cleanliness ? '✓' : '✗'}
                 </Text>
               </View>
               <Text style={styles.checklistText}>Cleanliness & Hygiene</Text>
@@ -271,35 +328,17 @@ export default function BusinessDashboard() {
                 style={[
                   styles.checkIcon,
                   {
-                    backgroundColor: data.sections.cruelty_free
+                    backgroundColor: data.progress.cruelty_free
                       ? '#27ae60'
                       : '#e74c3c',
                   },
                 ]}
               >
                 <Text style={styles.checkIconText}>
-                  {data.sections.cruelty_free ? '✓' : '✗'}
+                  {data.progress.cruelty_free ? '✓' : '✗'}
                 </Text>
               </View>
-              <Text style={styles.checklistText}>Cruelty-Free Operations</Text>
-            </View>
-
-            <View style={styles.checklistItem}>
-              <View
-                style={[
-                  styles.checkIcon,
-                  {
-                    backgroundColor: data.sections.sustainability
-                      ? '#27ae60'
-                      : '#e74c3c',
-                  },
-                ]}
-              >
-                <Text style={styles.checkIconText}>
-                  {data.sections.sustainability ? '✓' : '✗'}
-                </Text>
-              </View>
-              <Text style={styles.checklistText}>Sustainability</Text>
+              <Text style={styles.checklistText}>Cruelty Free Verification</Text>
             </View>
           </View>
         </View>
@@ -309,33 +348,14 @@ export default function BusinessDashboard() {
           <Text style={styles.cardTitle}>Document Uploads</Text>
           <View style={styles.documentContainer}>
             <View style={styles.documentCircle}>
-              <Text style={styles.documentCount}>{data.document_uploads}</Text>
+              <Text style={styles.documentCount}>{Object.values(data.progress).filter(Boolean).length}</Text>
             </View>
-            <Text style={styles.documentText}>Documents Uploaded</Text>
+            <Text style={styles.documentText}>
+              {Object.values(data.progress).filter(Boolean).length} of 5 sections completed
+            </Text>
           </View>
         </View>
-
-        {/* Audit Warning if needed */}
-        {data.audit_required && (
-          <View style={styles.warningCard}>
-            <View style={styles.warningIconContainer}>
-              <Text style={styles.warningIcon}>⚠️</Text>
-            </View>
-            <View style={styles.warningTextContainer}>
-              <Text style={styles.warningTitle}>Audit Required</Text>
-              <Text style={styles.warningText}>
-                Your application is under review by the audit team. This may take 3-5 business days.
-              </Text>
-            </View>
-          </View>
-        )}
-
-        {/* Last Updated */}
-        <Text style={styles.lastUpdated}>
-          Last updated: {new Date(data.last_updated).toLocaleString()}
-        </Text>
-
-        {/* Complete Application Button */}
+        {/* Certification Button */}
         {data.completion_percentage < 100 && (
           <TouchableOpacity
             style={styles.completeButton}
@@ -351,10 +371,10 @@ export default function BusinessDashboard() {
   );
 }
 
+// Add additional styles for the activity section
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
   },
   scrollContent: {
     padding: 16,
@@ -414,6 +434,28 @@ const styles = StyleSheet.create({
     marginTop: 5,
     marginBottom: 10,
   },
+  infoText: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 5,
+  },
+  infoContainer: {
+    marginTop: 5,
+  },
+  infoItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  infoLabel: {
+    fontSize: 15,
+    color: '#666',
+  },
+  infoValue: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#333',
+  },
   statusBadge: {
     paddingHorizontal: 15,
     paddingVertical: 5,
@@ -427,9 +469,9 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 16,
-    marginBottom: 16,
+    borderRadius: 15,
+    padding: 18,
+    marginBottom: 18,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -454,6 +496,7 @@ const styles = StyleSheet.create({
   progressBar: {
     height: '100%',
     backgroundColor: '#f39c12',
+    borderRadius: 6,
   },
   progressText: {
     fontSize: 14,
@@ -469,12 +512,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   checkIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 14,
   },
   checkIconText: {
     color: '#fff',

@@ -3,12 +3,14 @@ import { View, ActivityIndicator, Text, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { getUserData, isAuthenticated, UserRole } from './auth';
 
+// Interface for component props
 interface ProtectedRouteProps {
   children: React.ReactNode;
   allowedRoles: UserRole[];
 }
 
-export default function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
+// Main component implementation
+function ProtectedRouteComponent({ children, allowedRoles }: ProtectedRouteProps) {
   const [loading, setLoading] = useState(true);
   const [authorized, setAuthorized] = useState(false);
   const router = useRouter();
@@ -96,4 +98,12 @@ const styles = StyleSheet.create({
     color: '#e74c3c',
     textAlign: 'center',
   },
-}); 
+});
+
+// This default export is necessary for Expo Router compatibility
+export default function ProtectedRoutePage() {
+  return null;
+}
+
+// Export the ProtectedRoute component for use in other files
+export { ProtectedRouteComponent as ProtectedRoute };

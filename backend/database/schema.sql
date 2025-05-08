@@ -26,6 +26,8 @@ CREATE TABLE IF NOT EXISTS business_certification (
     gst_number VARCHAR(100),
     owner_name VARCHAR(255) NOT NULL,
     citizenship VARCHAR(50),
+    owner_mobile VARCHAR(20),
+    owner_email VARCHAR(100),
     mobile_verified BOOLEAN DEFAULT FALSE,
     email_verified BOOLEAN DEFAULT FALSE,
     pan_card_owner VARCHAR(100),
@@ -33,7 +35,11 @@ CREATE TABLE IF NOT EXISTS business_certification (
     vendor_count INT DEFAULT 0,
     vendor_certification JSON, -- stores vendor certifications as JSON
     cleanliness_rating INT DEFAULT 0, -- cleanliness rating
+    is_vegetarian BOOLEAN DEFAULT FALSE,
+    is_vegan BOOLEAN DEFAULT FALSE,
     cruelty_free BOOLEAN DEFAULT FALSE,
+    sanitation_practices BOOLEAN DEFAULT FALSE,
+    waste_management BOOLEAN DEFAULT FALSE,
     sustainability TEXT,
     photos JSON, -- stores photo URLs or file paths
     status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',

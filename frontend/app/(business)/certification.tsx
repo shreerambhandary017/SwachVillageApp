@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_CONFIG } from '../utils/config';
 import { 
   View, 
   Text, 
@@ -116,7 +117,7 @@ export default function CertificationScreen() {
           throw new Error('Authentication token not found');
         }
         
-        const response = await fetch('http://192.168.1.5:5000/api/business/certification', {
+        const response = await fetch(`${API_CONFIG.API_URL}/business/certification`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`
@@ -238,31 +239,172 @@ export default function CertificationScreen() {
           setError('Owner name is required');
           return false;
         }
+        if (!form.ownerMobile) {
+          setError('Owner mobile number is required');
+          return false;
+        }
+        if (!form.ownerEmail) {
+          setError('Owner email is required');
+          return false;
+        }
+        if (!form.citizenship) {
+          setError('Citizenship is required');
+          return false;
+        }
         break;
       
       case 'vendor_compliance':
-        // Vendor section can be skipped, so no validation
+        // Even though this step can be skipped, validate if they choose to save
+        if (form.vendorCertified && !form.vendorCertificationNumbers) {
+          setError('Vendor certification numbers are required if vendors are certified');
+          return false;
+        }
+        if (form.vendorCount < 0) {
+          setError('Vendor count cannot be negative');
+          return false;
+        }
         break;
       
       case 'cleanliness':
-        // Cleanliness section can be skipped, so no validation
+        // Require at least a cleanliness rating if they choose to save
+        if (!form.cleanlinessRating || form.cleanlinessRating < 1 || form.cleanlinessRating > 5) {
+          setError('Please provide a cleanliness rating between 1 and 5');
+          return false;
+        }
         break;
       
       case 'cruelty_free':
-        // Cruelty free section can be skipped, so no validation
+        // At least one field must be selected if they choose to save
+        if (!form.isVegetarian && !form.isVegan && !form.isCrueltyFree) {
+          setError('Please select at least one option');
+          return false;
+        }
         break;
       
       case 'sustainability':
-        // Can be skipped
+        if (!form.sustainability || form.sustainability.trim() === '') {
+          setError('Please provide information about your sustainability practices');
+          return false;
+        }
         break;
     }
     
     return true;
   };
 
+  // Strict validation for each step that requires all fields to be filled
+  const validateStepCompleteness = () => {
+    switch (currentStep) {
+      case 'business_details':
+        if (!form.businessName || form.businessName.trim() === '') {
+          setError('Business name is required');
+          return false;
+        }
+        if (!form.registrationNumber && !form.panCard && !form.gstNumber) {
+          setError('At least one business identification document is required');
+          return false;
+        }
+        // Check that each field that has been started is also completed
+        if (form.registrationNumber && form.registrationNumber.trim() === '') {
+          setError('Registration number cannot be empty if provided');
+          return false;
+        }
+        if (form.panCard && form.panCard.trim() === '') {
+          setError('PAN card number cannot be empty if provided');
+          return false;
+        }
+        if (form.aadhaarCard && form.aadhaarCard.trim() === '') {
+          setError('Aadhaar card number cannot be empty if provided');
+          return false;
+        }
+        if (form.gstNumber && form.gstNumber.trim() === '') {
+          setError('GST number cannot be empty if provided');
+          return false;
+        }
+        break;
+      
+      case 'owner_details':
+        if (!form.ownerName || form.ownerName.trim() === '') {
+          setError('Owner name is required');
+          return false;
+        }
+        if (!form.ownerMobile || form.ownerMobile.trim() === '') {
+          setError('Owner mobile number is required');
+          return false;
+        }
+        if (!form.ownerEmail || form.ownerEmail.trim() === '') {
+          setError('Owner email is required');
+          return false;
+        }
+        if (!form.citizenship || form.citizenship.trim() === '') {
+          setError('Citizenship is required');
+          return false;
+        }
+        // Additional validations for optional fields if they've been started
+        if (form.ownerPanCard && form.ownerPanCard.trim() === '') {
+          setError('Owner PAN card number cannot be empty if provided');
+          return false;
+        }
+        if (form.ownerAadhaarCard && form.ownerAadhaarCard.trim() === '') {
+          setError('Owner Aadhaar card number cannot be empty if provided');
+          return false;
+        }
+        break;
+      
+      case 'vendor_compliance':
+        // Vendor count must be valid
+        if (form.vendorCount < 0) {
+          setError('Vendor count cannot be negative');
+          return false;
+        }
+        // If vendor certified is checked, certification numbers must be provided
+        if (form.vendorCertified && (!form.vendorCertificationNumbers || form.vendorCertificationNumbers.trim() === '')) {
+          setError('Vendor certification numbers are required if vendors are certified');
+          return false;
+        }
+        break;
+      
+      case 'cleanliness':
+        // Cleanliness rating is required
+        if (!form.cleanlinessRating || form.cleanlinessRating < 1 || form.cleanlinessRating > 5) {
+          setError('Please provide a cleanliness rating between 1 and 5');
+          return false;
+        }
+        // If photos are added, there should be at least one
+        if (form.photos.length === 0) {
+          setError('Please upload at least one photo of your facility');
+          return false;
+        }
+        break;
+      
+      case 'cruelty_free':
+        // At least one option must be selected
+        if (!form.isVegetarian && !form.isVegan && !form.isCrueltyFree) {
+          setError('Please select at least one option');
+          return false;
+        }
+        break;
+      
+      case 'sustainability':
+        // Sustainability text is required and must be meaningful
+        if (!form.sustainability || form.sustainability.trim() === '') {
+          setError('Please provide information about your sustainability practices');
+          return false;
+        }
+        if (form.sustainability.trim().length < 50) {
+          setError('Please provide more detailed information about your sustainability practices (at least 50 characters)');
+          return false;
+        }
+        break;
+    }
+    
+    return true;
+  };
+  
   // Save current step data
   const saveCurrentStep = async () => {
-    if (!validateCurrentStep()) {
+    // Use the stricter validation function for Save & Continue
+    if (!validateStepCompleteness()) {
       return;
     }
     
@@ -332,13 +474,16 @@ export default function CertificationScreen() {
       }
       
       // Send data to backend
-      const response = await fetch(`http://192.168.1.5:5000/api/business/certification/${currentStep}`, {
+      const response = await fetch(`${API_CONFIG.API_URL}/business/certification`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(apiData),
+        body: JSON.stringify({
+          step: currentStep,
+          ...apiData
+        }),
       });
       
       const data = await response.json();
@@ -380,6 +525,33 @@ export default function CertificationScreen() {
     
     nextStep();
   };
+  
+  // Save progress and go to dashboard
+  const saveAndGoHome = async () => {
+    setLoading(true);
+    setError('');
+    
+    try {
+      // Save current progress first
+      if (currentStep === 'business_details' || currentStep === 'owner_details') {
+        // For mandatory steps, validate before saving
+        if (!validateCurrentStep()) {
+          setLoading(false);
+          return;
+        }
+        
+        // Try to save current step
+        await saveCurrentStep();
+      }
+      
+      // Navigate to dashboard
+      router.replace('/(business)/dashboard');
+    } catch (error) {
+      console.error('Error saving progress:', error);
+      setError('Failed to save progress. Please try again.');
+      setLoading(false);
+    }
+  };
 
   // Final submission
   const finalSubmit = async () => {
@@ -394,7 +566,7 @@ export default function CertificationScreen() {
     try {
       const token = await getAuthToken();
       
-      const response = await fetch('http://192.168.1.5:5000/api/business/certification/submit', {
+      const response = await fetch(`${API_CONFIG.API_URL}/business/certification/submit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -827,39 +999,53 @@ export default function CertificationScreen() {
           
           <View style={styles.navigationButtons}>
             {currentStep !== 'business_details' && (
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.backButton}
                 onPress={prevStep}
                 disabled={loading}
               >
-                <Text style={styles.backButtonText}>Back</Text>
+                <Text style={styles.backButtonText}>Previous</Text>
               </TouchableOpacity>
             )}
             
+            {/* Skip button for non-mandatory steps */}
             {(currentStep !== 'business_details' && currentStep !== 'owner_details') && (
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.skipButton}
                 onPress={skipStep}
                 disabled={loading}
               >
-                <Text style={styles.skipButtonText}>Skip</Text>
+                <Text style={styles.skipButtonText}>Skip This Step</Text>
               </TouchableOpacity>
             )}
             
-            <TouchableOpacity 
-              style={styles.submitButton}
-              onPress={currentStep === 'sustainability' ? finalSubmit : saveCurrentStep}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.submitButtonText}>
-                  {currentStep === 'sustainability' ? 'Submit' : 'Save & Continue'}
-                </Text>
-              )}
-            </TouchableOpacity>
+            {currentStep === 'sustainability' ? (
+              <TouchableOpacity
+                style={styles.submitButton}
+                onPress={finalSubmit}
+                disabled={loading}
+              >
+                <Text style={styles.submitButtonText}>Submit Certification</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={styles.submitButton}
+                onPress={saveCurrentStep}
+                disabled={loading}
+              >
+                <Text style={styles.submitButtonText}>Save & Continue</Text>
+              </TouchableOpacity>
+            )}
           </View>
+          
+          {/* Skip and go to home button */}
+          <TouchableOpacity
+            style={styles.skipToHomeButton}
+            onPress={saveAndGoHome}
+            disabled={loading}
+          >
+            <Text style={styles.skipToHomeButtonText}>Skip and go to home</Text>
+          </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -1086,9 +1272,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  skipToHomeButton: {
+    backgroundColor: '#f0ad4e',
+    borderRadius: 8,
+    padding: 15,
+    alignItems: 'center',
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#eea236',
+  },
+  skipToHomeButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
   errorText: {
     color: '#e74c3c',
-    marginBottom: 15,
+    fontSize: 16,
     textAlign: 'center',
+    marginBottom: 15,
   },
-}); 
+});

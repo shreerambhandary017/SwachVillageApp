@@ -9,6 +9,7 @@ import {
   Alert
 } from 'react-native';
 import { BarCodeScanner } from 'expo-barcode-scanner';
+import { API_CONFIG } from '../utils/config';
 import { useRouter } from 'expo-router';
 import { getAuthToken } from '../utils/auth';
 
@@ -40,7 +41,7 @@ export default function ScanBarcodeScreen() {
         throw new Error('Authentication token not found');
       }
       
-      const response = await fetch(`http://192.168.1.5:5000/api/products/verify`, {
+      const response = await fetch(`${API_CONFIG.API_URL}/products/verify`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
+import { API_CONFIG } from './config';
 
 // Types
 export type UserRole = 'business' | 'consumer';
@@ -34,7 +35,7 @@ export interface AuthResponse {
 }
 
 // Constants
-const API_URL = 'http://192.168.1.5:5000/api'; // Replace with your Flask API URL
+const API_URL = API_CONFIG.API_URL; // Using centralized config
 const AUTH_TOKEN_KEY = 'auth_token';
 const USER_DATA_KEY = 'user_data';
 
@@ -154,4 +155,34 @@ export const getUserData = async (): Promise<User | null> => {
 export const isAuthenticated = async (): Promise<boolean> => {
   const token = await getAuthToken();
   return !!token;
-}; 
+};
+
+// Helper function to navigate after authentication
+export const navigateByRole = async (router: any) => {
+  try {
+    const userData = await getUserData();
+    if (!userData) {
+      console.log('No user data found, redirecting to sign-in');
+      router.replace('/(auth)/sign-in');
+      return;
+    }
+    
+    console.log('Navigating by role:', userData.role);
+    
+    if (userData.role === 'business') {
+      // For business users, check if they've completed certification
+      router.replace('/(business)/certification');
+    } else {
+      // For consumer users, go to home
+      router.replace('/(consumer)');
+    }
+  } catch (error) {
+    console.error('Navigation error:', error);
+    router.replace('/(auth)/sign-in');
+  }
+};
+
+// This tells Expo Router to ignore this file as a route
+export default function AuthPage() {
+  return null;
+} 
