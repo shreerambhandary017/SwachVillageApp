@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../utils/ThemeContext';
 import { API_CONFIG } from '../utils/config';
+import { getAuthToken } from '../utils/auth';
 
 // Product type definition
 type Product = {
@@ -38,32 +39,43 @@ export default function VerifyScreen() {
   const [error, setError] = useState('');
   const [searched, setSearched] = useState(false);
 
-  const handleSearchProduct = async () => {
+  const verifyProduct = async () => {
     if (!productCode.trim()) {
       setError('Please enter a product code');
       return;
     }
 
+    setLoading(true);
+    setError('');
+    setSearched(true);
+
     try {
-      setLoading(true);
-      setError('');
-      setSearched(true);
+      const token = await getAuthToken();
       
-      const response = await fetch(`${API_CONFIG.API_URL}/products/verify?code=${productCode}`);
-      
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error('Product not found. Please check the code and try again.');
-        }
-        throw new Error('Failed to verify product. Please try again.');
+      if (!token) {
+        throw new Error('Authentication required');
       }
       
+      const response = await fetch(`${API_CONFIG.API_URL}/consumer/verify-product`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ product_code: productCode }),
+      });
+
       const data = await response.json();
-      setProduct(data.product || null);
-    } catch (error: any) {
-      console.error('Error verifying product:', error);
-      setError(error.message || 'Error verifying product. Please try again.');
-      setProduct(null);
+
+      if (response.ok && data.success) {
+        setProduct(data.product);
+        setProductCode('');
+      } else {
+        setError(data.message || 'Failed to verify product');
+      }
+    } catch (error) {
+      setError('Network error. Please try again.');
+      console.error('Verification error:', error);
     } finally {
       setLoading(false);
     }
@@ -113,11 +125,11 @@ export default function VerifyScreen() {
                   value={productCode}
                   onChangeText={setProductCode}
                   returnKeyType="search"
-                  onSubmitEditing={handleSearchProduct}
+                  onSubmitEditing={verifyProduct}
                 />
                 <TouchableOpacity
                   style={[styles.searchButton, { backgroundColor: colors.primary }]}
-                  onPress={handleSearchProduct}
+                  onPress={verifyProduct}
                 >
                   <Ionicons name="search" size={20} color="white" />
                 </TouchableOpacity>

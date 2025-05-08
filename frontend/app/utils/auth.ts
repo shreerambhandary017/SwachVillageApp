@@ -23,9 +23,16 @@ export interface RegisterCredentials {
 export interface User {
   id: number;
   name: string;
+  full_name?: string;
   email: string;
+  phone?: string;
   role: UserRole;
   is_verified: boolean;
+  created_at?: string;
+  profile_completed?: boolean;
+  username?: string;
+  first_name?: string;
+  last_name?: string;
 }
 
 export interface AuthResponse {

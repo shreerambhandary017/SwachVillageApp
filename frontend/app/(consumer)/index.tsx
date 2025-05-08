@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../utils/ThemeContext';
 import { API_CONFIG } from '../utils/config';
+import { getAuthToken } from '../utils/auth';
 
 // Business type definition
 type Business = {
@@ -29,7 +30,19 @@ export default function ConsumerDashboard() {
   const fetchBusinesses = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_CONFIG.API_URL}/businesses/certified`);
+      
+      // Get authentication token
+      const token = await getAuthToken();
+      
+      if (!token) {
+        throw new Error('Authentication required');
+      }
+      
+      const response = await fetch(`${API_CONFIG.API_URL}/consumer/businesses`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
 
       if (!response.ok) {
         throw new Error('Failed to fetch businesses');
@@ -104,7 +117,9 @@ export default function ConsumerDashboard() {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>Swach Village</Text>
-        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Certified Businesses</Text>
+        <TouchableOpacity style={[styles.profileButton, { backgroundColor: colors.primary }]} onPress={() => router.push('/profile')}>
+          <Ionicons name="person" size={20} color="white" />
+        </TouchableOpacity>
       </View>
 
       {loading ? (
@@ -137,11 +152,8 @@ export default function ConsumerDashboard() {
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
             <View style={styles.listHeader}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                Certified Businesses
-              </Text>
-              <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
-                These businesses have been verified as clean and cruelty-free
+              <Text style={[styles.sectionTitle, { color: colors.primary }]}>
+                Certified Eco-Friendly Businesses
               </Text>
             </View>
           }
@@ -156,19 +168,29 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    padding: 20,
-    paddingTop: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    paddingTop: 50,
+    paddingHorizontal: 20,
   },
   title: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: 'bold',
-    marginBottom: 6,
-    textAlign: 'center',
+    marginBottom: 0,
   },
-  subtitle: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 10,
+  profileButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
   },
   loadingContainer: {
     flex: 1,

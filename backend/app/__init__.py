@@ -43,6 +43,9 @@ def create_app():
     from .feedback import feedback_bp
     app.register_blueprint(feedback_bp, url_prefix='/api/feedback')
     
+    from .consumer import consumer_bp
+    app.register_blueprint(consumer_bp, url_prefix='/api/consumer')
+    
     @app.route('/api/health')
     def health_check():
         return {'status': 'OK', 'message': 'Swach Village API is running'}

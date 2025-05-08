@@ -11,13 +11,29 @@ import { THEME_SIZING } from './utils/theme';
 export default function SplashScreen() {
   const router = useRouter();
   const loadingAnimation = useRef(new Animated.Value(0)).current;
+  const fadeAnimation = useRef(new Animated.Value(0)).current;
+  const scaleAnimation = useRef(new Animated.Value(0.9)).current;
   const { theme } = useTheme();
 
   useEffect(() => {
+    // Fade in animation
+    Animated.timing(fadeAnimation, {
+      toValue: 1,
+      duration: 800,
+      useNativeDriver: true,
+    }).start();
+    
+    // Subtle scale animation
+    Animated.timing(scaleAnimation, {
+      toValue: 1,
+      duration: 1000,
+      useNativeDriver: true,
+    }).start();
+    
     // Animate the loading bar
     Animated.timing(loadingAnimation, {
       toValue: 1,
-      duration: 3500, // 3.5 seconds for the loading animation
+      duration: 3200, // 3.2 seconds for the loading animation
       useNativeDriver: false,
     }).start();
     
@@ -64,57 +80,83 @@ export default function SplashScreen() {
     outputRange: ['0%', '100%'],
   });
   
-  // Different gradient colors for light and dark mode
+  // Enhanced gradient colors for light and dark mode
   const gradientColors = theme === 'dark' 
-    ? ['#121212', '#212121', '#333333'] as const // Dark mode - shades of black
-    : ['#FFFFFF', '#FFF8F0'] as const;           // Light mode - white to very light orange
+    ? ['#121212', '#1A1A1A', '#262626'] as const // Dark mode - cleaner dark gradient
+    : ['#FFFFFF', '#FAFAFA', '#F5F5F5'] as const; // Light mode - subtle light gradient
   
-  // Accent colors based on theme
-  const accentColor = theme === 'dark' ? '#FF7B00' : '#FF7B00'; // Orange for both
+  // Accent colors based on theme - more vibrant for better visibility
+  const accentColor = theme === 'dark' ? '#FF9800' : '#FF7B00';
+  const logoRingColor = theme === 'dark' ? 'rgba(255, 152, 0, 0.2)' : 'rgba(255, 123, 0, 0.15)';
   
   return (
     <LinearGradient
       colors={gradientColors}
       style={styles.container}
     >
-      {/* Background decorative elements */}
+      {/* Modern geometric background elements */}
       <View style={styles.backgroundElements}>
+        {/* Larger circular accent in the background */}
+        <Svg height="500" width="500" style={[styles.decorativeBubble, { top: '-10%', right: '-20%' }]}>
+          <Circle cx="250" cy="250" r="250" fill={theme === 'dark' ? 'rgba(255, 152, 0, 0.05)' : 'rgba(255, 123, 0, 0.05)'} />
+        </Svg>
+        
+        {/* Smaller accents */}
         <Svg height="200" width="200" style={[styles.decorativeBubble, styles.bubble1]}>
-          <Circle cx="100" cy="100" r="50" fill={theme === 'dark' ? 'rgba(255, 123, 0, 0.1)' : 'rgba(255, 123, 0, 0.2)'} />
+          <Circle cx="100" cy="100" r="50" fill={theme === 'dark' ? 'rgba(255, 152, 0, 0.1)' : 'rgba(255, 123, 0, 0.12)'} />
         </Svg>
         <Svg height="150" width="150" style={[styles.decorativeBubble, styles.bubble2]}>
-          <Circle cx="75" cy="75" r="40" fill={theme === 'dark' ? 'rgba(255, 123, 0, 0.15)' : 'rgba(255, 123, 0, 0.25)'} />
+          <Circle cx="75" cy="75" r="40" fill={theme === 'dark' ? 'rgba(255, 152, 0, 0.15)' : 'rgba(255, 123, 0, 0.15)'} />
         </Svg>
-        <Svg height="100" width="100" style={[styles.decorativeBubble, styles.bubble3]}>
-          <Circle cx="50" cy="50" r="30" fill={theme === 'dark' ? 'rgba(255, 123, 0, 0.2)' : 'rgba(255, 123, 0, 0.3)'} />
+        <Svg height="120" width="120" style={[styles.decorativeBubble, { bottom: '12%', right: '8%' }]}>
+          <Circle cx="60" cy="60" r="35" fill={theme === 'dark' ? 'rgba(255, 152, 0, 0.12)' : 'rgba(255, 123, 0, 0.18)'} />
         </Svg>
       </View>
 
-      <View style={styles.contentContainer}>
-        {/* Logo with double circle background */}
-        <View style={styles.logoOuterCircle}>
-          <View style={[styles.logoContainer, { backgroundColor: accentColor }]}>
-            <Image
-              source={require('../assets/images/swach_logo.png')}
-              style={styles.logo}
-              contentFit="contain"
-            />
+      <Animated.View 
+        style={[styles.contentContainer, {
+          opacity: fadeAnimation,
+          transform: [{ scale: scaleAnimation }]
+        }]}
+      >
+        {/* Enhanced logo with multi-layered background for depth */}
+        <View style={[styles.logoOuter, { backgroundColor: theme === 'dark' ? 'rgba(255, 152, 0, 0.1)' : 'rgba(255, 123, 0, 0.1)' }]}>
+          <View style={[styles.logoMiddle, { backgroundColor: theme === 'dark' ? 'rgba(255, 152, 0, 0.2)' : 'rgba(255, 123, 0, 0.15)' }]}>
+            <LinearGradient
+              colors={theme === 'dark' ? ['#FFFFFF', '#FFFFFF'] : ['#FFFFFF', '#FFFFFF']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.logoContainer}>
+              <View style={styles.logoInnerShadow}>
+                <Image
+                  source={require('../assets/images/swach_logo.png')}
+                  style={styles.logo}
+                  contentFit="contain"
+                />
+              </View>
+            </LinearGradient>
           </View>
         </View>
         <Text style={[styles.title, { color: theme === 'dark' ? '#FFFFFF' : '#212121' }]}>Swach Village</Text>
         <Text style={[styles.subtitle, { color: theme === 'dark' ? '#B0B0B0' : '#757575' }]}>
           Empowering Clean & Cruelty-Free Businesses
         </Text>
+        <Text style={[styles.version, { color: theme === 'dark' ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)' }]}>
+          v1.0.0
+        </Text>
         
-        <View style={[styles.loadingBarContainer, { backgroundColor: theme === 'dark' ? 'rgba(255, 123, 0, 0.3)' : 'rgba(255, 123, 0, 0.2)' }]}>
+        <View style={[styles.loadingBarContainer, { backgroundColor: theme === 'dark' ? 'rgba(255, 152, 0, 0.15)' : 'rgba(255, 123, 0, 0.12)' }]}>
           <Animated.View 
             style={[
               styles.loadingBar,
               { width: loadingWidth, backgroundColor: accentColor }
             ]} 
           />
+          <Text style={[styles.loadingText, { color: theme === 'dark' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.5)' }]}>
+            Loading...
+          </Text>
         </View>
-      </View>
+      </Animated.View>
     </LinearGradient>
   );
 }
@@ -130,23 +172,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: width * 0.8,
   },
-  logoOuterCircle: {
+  logoOuter: {
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 30,
+  },
+  logoMiddle: {
     width: 160,
     height: 160,
     borderRadius: 80,
-    backgroundColor: 'rgba(255, 123, 0, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.25,
-        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
       },
       android: {
-        elevation: 6,
+        elevation: 4,
       },
     }),
   },
@@ -154,14 +202,31 @@ const styles = StyleSheet.create({
     width: 140,
     height: 140,
     borderRadius: 70,
-    backgroundColor: '#FF7B00',
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3,
+      },
+      android: {
+        elevation: 6,
+      },
+    }),
+  },
+  logoInnerShadow: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 70,
   },
   logo: {
-    width: 100,
-    height: 100,
+    width: 110,
+    height: 110,
   },
   backgroundElements: {
     position: 'absolute',
@@ -195,19 +260,34 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     color: '#ffffff',
-    marginBottom: 40,
+    marginBottom: 10,
     textAlign: 'center',
     opacity: 0.9,
+    fontWeight: '400',
+  },
+  version: {
+    fontSize: 12,
+    marginBottom: 30,
+    textAlign: 'center',
+    fontWeight: '400',
   },
   loadingBarContainer: {
     height: 6,
     width: '100%',
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    borderRadius: 3,
+    borderRadius: 8,
     overflow: 'hidden',
+    marginBottom: 8,
   },
   loadingBar: {
     height: '100%',
     backgroundColor: '#ffffff',
+    borderRadius: 8,
+  },
+  loadingText: {
+    fontSize: 12,
+    textAlign: 'center',
+    fontWeight: '500',
+    letterSpacing: 1,
   },
 }); 

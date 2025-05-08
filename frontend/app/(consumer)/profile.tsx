@@ -13,50 +13,101 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../utils/ThemeContext';
 import { API_CONFIG } from '../utils/config';
-import { getUserData, logoutUser } from '../utils/auth';
+import { getUserData, logoutUser, getAuthToken } from '../utils/auth';
 
-// User type definition
-type User = {
+// Extended user type definition
+type ExtendedUser = {
   id: number;
-  full_name: string;
+  name: string;
+  full_name?: string;
   email: string;
-  phone: string;
+  phone?: string;
   role: string;
-  created_at: string;
-  profile_completed: boolean;
+  is_verified: boolean;
+  created_at?: string;
+  profile_completed?: boolean;
 };
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { colors, theme, setTheme, isSystemTheme } = useTheme();
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<ExtendedUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [currentTheme, setCurrentTheme] = useState<'light' | 'dark' | 'system'>(
+    isSystemTheme ? 'system' : (theme as 'light' | 'dark')
+  );
 
   useEffect(() => {
-    fetchUserProfile();
+    loadUserData();
   }, []);
 
-  const fetchUserProfile = async () => {
+  useEffect(() => {
+    setCurrentTheme(isSystemTheme ? 'system' : (theme as 'light' | 'dark'));
+  }, [theme, isSystemTheme]);
+
+  const loadUserData = async () => {
     try {
       setLoading(true);
+      const token = await getAuthToken();
+      
+      if (!token) {
+        throw new Error('Authentication required');
+      }
+      
+      // First try to get user profile from the API
+      try {
+        const response = await fetch(`${API_CONFIG.API_URL}/consumer/profile`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+          // Ensure data.user conforms to our ExtendedUser type
+          const userProfile: ExtendedUser = {
+            id: data.user.id,
+            name: data.user.name || data.user.username || '',
+            full_name: data.user.full_name || '',
+            email: data.user.email || '',
+            phone: data.user.phone || '',
+            role: data.user.role || 'consumer',
+            is_verified: Boolean(data.user.is_verified),
+            created_at: data.user.created_at || new Date().toISOString(),
+            profile_completed: Boolean(data.user.profile_completed)
+          };
+          setUser(userProfile);
+          return;
+        }
+      } catch (apiError) {
+        console.log('API fetch failed, falling back to local storage');
+      }
+      
+      // Fallback to local storage if API fails
       const userData = await getUserData();
-      
-      if (!userData || !userData.id) {
-        throw new Error('User information not found');
+      if (!userData) {
+        throw new Error('User data not available');
       }
       
-      const response = await fetch(`${API_CONFIG.API_URL}/users/${userData.id}`);
+      // Ensure the stored user data matches our ExtendedUser type
+      const userFromStorage: ExtendedUser = {
+        id: userData.id,
+        name: userData.name || '',
+        full_name: userData.full_name || userData.name || '',
+        email: userData.email || '',
+        phone: userData.phone || '',
+        role: userData.role || 'consumer',
+        is_verified: Boolean(userData.is_verified),
+        created_at: userData.created_at || new Date().toISOString(),
+        profile_completed: Boolean(userData.profile_completed)
+      };
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch user profile');
-      }
-      
-      const data = await response.json();
-      setUser(data.user || null);
-    } catch (error) {
-      console.error('Error fetching user profile:', error);
-      setError('Unable to load profile. Please try again later.');
+      setUser(userFromStorage);
+    } catch (error: any) {
+      console.error('Error loading user data:', error);
+      setError(error.message || 'Failed to load user data');
     } finally {
       setLoading(false);
     }
@@ -77,7 +128,10 @@ export default function ProfileScreen() {
           onPress: async () => {
             try {
               await logoutUser();
-              router.replace('/(auth)/sign-in');
+              // Force a small delay to ensure AsyncStorage updates complete
+              setTimeout(() => {
+                router.replace('/(auth)/sign-in');
+              }, 100);
             } catch (error) {
               console.error('Logout error:', error);
               Alert.alert('Error', 'Failed to log out. Please try again.');
@@ -88,158 +142,198 @@ export default function ProfileScreen() {
     );
   };
 
-  const toggleTheme = () => {
-    if (theme === 'light') {
-      setTheme('dark');
-    } else {
-      setTheme('light');
+  const handleThemeChange = (newTheme: 'light' | 'dark' | 'system') => {
+    setCurrentTheme(newTheme);
+    setTheme(newTheme);
+  };
+
+  const handleRefresh = () => {
+    loadUserData();
+  };
+
+  const formatDate = (dateString: string | undefined) => {
+    if (!dateString) return 'N/A';
+    
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+    } catch (error) {
+      return 'Invalid date';
     }
   };
 
-  const setSystemTheme = () => {
-    setTheme('system');
-  };
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.text }]}>Loading profile...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
-  const formatDate = (dateString: string) => {
-    const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'long', day: 'numeric' };
-    return new Date(dateString).toLocaleDateString(undefined, options);
-  };
+  if (error) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={40} color={colors.error} />
+          <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
+          <TouchableOpacity
+            style={[styles.retryButton, { backgroundColor: colors.primary }]}
+            onPress={handleRefresh}
+          >
+            <Text style={styles.retryButtonText}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>Profile</Text>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            Your account information
-          </Text>
+          <Text style={[styles.title, { color: colors.text }]}>Settings</Text>
         </View>
-        
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-              Loading profile...
-            </Text>
-          </View>
-        ) : error ? (
-          <View style={styles.errorContainer}>
-            <Ionicons name="alert-circle-outline" size={40} color={colors.error} />
-            <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
-            <TouchableOpacity
-              style={[styles.retryButton, { backgroundColor: colors.primary }]}
-              onPress={fetchUserProfile}
-            >
-              <Text style={styles.retryButtonText}>Try Again</Text>
-            </TouchableOpacity>
-          </View>
-        ) : user ? (
-          <View style={styles.profileContainer}>
-            <View style={[styles.profileHeader, { backgroundColor: colors.primary }]}>
-              <View style={styles.profileAvatarContainer}>
-                <View style={styles.profileAvatar}>
-                  <Text style={styles.profileInitials}>
-                    {user.full_name.split(' ').map(n => n[0]).join('').toUpperCase()}
-                  </Text>
-                </View>
+
+        {user && (
+          <View style={[styles.userInfoContainer, { backgroundColor: colors.primary }]}>
+            <View style={styles.avatarContainer}>
+              <View style={styles.avatar}>
+                <Ionicons name="person" size={40} color="white" />
               </View>
-              <Text style={styles.profileName}>{user.full_name}</Text>
-              <Text style={styles.profileRole}>{user.role.charAt(0).toUpperCase() + user.role.slice(1)}</Text>
-            </View>
-            
-            <View style={[styles.profileCard, { backgroundColor: colors.surface }]}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Account Information</Text>
-              
-              <View style={styles.infoRow}>
-                <View style={styles.infoIconContainer}>
-                  <Ionicons name="mail-outline" size={20} color={colors.primary} />
-                </View>
-                <View style={styles.infoContent}>
-                  <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Email</Text>
-                  <Text style={[styles.infoValue, { color: colors.text }]}>{user.email}</Text>
-                </View>
-              </View>
-              
-              <View style={styles.infoRow}>
-                <View style={styles.infoIconContainer}>
-                  <Ionicons name="call-outline" size={20} color={colors.primary} />
-                </View>
-                <View style={styles.infoContent}>
-                  <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Phone</Text>
-                  <Text style={[styles.infoValue, { color: colors.text }]}>{user.phone}</Text>
-                </View>
-              </View>
-              
-              <View style={styles.infoRow}>
-                <View style={styles.infoIconContainer}>
-                  <Ionicons name="calendar-outline" size={20} color={colors.primary} />
-                </View>
-                <View style={styles.infoContent}>
-                  <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Member Since</Text>
-                  <Text style={[styles.infoValue, { color: colors.text }]}>{formatDate(user.created_at)}</Text>
-                </View>
-              </View>
-            </View>
-            
-            <View style={[styles.settingsCard, { backgroundColor: colors.surface }]}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Settings</Text>
-              
-              <View style={styles.settingRow}>
-                <View style={styles.settingContent}>
-                  <Ionicons name={theme === 'dark' ? 'moon' : 'sunny'} size={20} color={colors.primary} />
-                  <Text style={[styles.settingLabel, { color: colors.text }]}>
-                    {theme === 'dark' ? 'Dark Mode' : 'Light Mode'}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  style={[styles.themeToggle, { backgroundColor: colors.background }]}
-                  onPress={toggleTheme}
-                >
-                  <View style={[
-                    styles.themeToggleHandle,
-                    { 
-                      backgroundColor: colors.primary,
-                      transform: [{ translateX: theme === 'dark' ? 20 : 0 }]
-                    }
-                  ]} />
-                </TouchableOpacity>
-              </View>
-              
-              <TouchableOpacity
-                style={[
-                  styles.systemThemeButton,
-                  { 
-                    backgroundColor: isSystemTheme ? colors.primary + '20' : 'transparent',
-                    borderColor: colors.border
-                  }
-                ]}
-                onPress={setSystemTheme}
-              >
-                <Text style={[
-                  styles.systemThemeText,
-                  { color: isSystemTheme ? colors.primary : colors.textSecondary }
-                ]}>
-                  Use System Theme
+              <Text style={[styles.nameText, { color: 'white' }]}>{user.name}</Text>
+              <Text style={[styles.emailText, { color: 'rgba(255, 255, 255, 0.8)' }]}>{user.email}</Text>
+              {user.phone && (
+                <Text style={[styles.phoneText, { color: 'rgba(255, 255, 255, 0.8)' }]}>{user.phone}</Text>
+              )}
+              <View style={styles.statusContainer}>
+                <Ionicons
+                  name={user.is_verified ? 'checkmark-circle' : 'alert-circle'}
+                  size={16}
+                  color={user.is_verified ? 'white' : 'yellow'}
+                />
+                <Text style={[styles.statusText, { color: 'white' }]}>
+                  {user.is_verified ? 'Verified Account' : 'Unverified Account'}
                 </Text>
-              </TouchableOpacity>
+              </View>
             </View>
-            
-            <TouchableOpacity
-              style={[styles.logoutButton, { backgroundColor: colors.error }]}
-              onPress={handleLogout}
-            >
-              <Ionicons name="log-out-outline" size={20} color="white" style={styles.logoutIcon} />
-              <Text style={styles.logoutButtonText}>Log Out</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View style={styles.errorContainer}>
-            <Ionicons name="person-outline" size={40} color={colors.textSecondary} />
-            <Text style={[styles.errorText, { color: colors.textSecondary }]}>
-              Profile not available
-            </Text>
           </View>
         )}
+
+        {/* Theme Selection */}
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Appearance</Text>
+          
+          <TouchableOpacity 
+            style={[
+              styles.themeOption, 
+              currentTheme === 'light' ? styles.selectedTheme : null, 
+              { borderColor: colors.primary }
+            ]}
+            onPress={() => handleThemeChange('light')}
+          >
+            <Ionicons 
+              name="sunny" 
+              size={24} 
+              color={currentTheme === 'light' ? colors.primary : colors.textSecondary} 
+            />
+            <Text 
+              style={[
+                styles.themeText, 
+                { color: currentTheme === 'light' ? colors.primary : colors.text }
+              ]}
+            >
+              Light
+            </Text>
+            {currentTheme === 'light' && <Ionicons name="checkmark-circle" size={18} color={colors.primary} />}
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[
+              styles.themeOption, 
+              currentTheme === 'dark' ? styles.selectedTheme : null, 
+              { borderColor: colors.primary }
+            ]}
+            onPress={() => handleThemeChange('dark')}
+          >
+            <Ionicons 
+              name="moon" 
+              size={24} 
+              color={currentTheme === 'dark' ? colors.primary : colors.textSecondary} 
+            />
+            <Text 
+              style={[
+                styles.themeText, 
+                { color: currentTheme === 'dark' ? colors.primary : colors.text }
+              ]}
+            >
+              Dark
+            </Text>
+            {currentTheme === 'dark' && <Ionicons name="checkmark-circle" size={18} color={colors.primary} />}
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[
+              styles.themeOption, 
+              currentTheme === 'system' ? styles.selectedTheme : null, 
+              { borderColor: colors.primary }
+            ]}
+            onPress={() => handleThemeChange('system')}
+          >
+            <Ionicons 
+              name="phone-portrait" 
+              size={24} 
+              color={currentTheme === 'system' ? colors.primary : colors.textSecondary} 
+            />
+            <Text 
+              style={[
+                styles.themeText, 
+                { color: currentTheme === 'system' ? colors.primary : colors.text }
+              ]}
+            >
+              System
+            </Text>
+            {currentTheme === 'system' && <Ionicons name="checkmark-circle" size={18} color={colors.primary} />}
+          </TouchableOpacity>
+        </View>
+
+        {/* Info Section */}
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>About</Text>
+          
+          <View style={[styles.infoRow, { borderBottomColor: colors.border }]}>
+            <Text style={[styles.infoLabel, { color: colors.text }]}>App Version</Text>
+            <Text style={[styles.infoValue, { color: colors.textSecondary }]}>1.0.0</Text>
+          </View>
+          
+          <View style={[styles.infoRow, { borderBottomColor: colors.border }]}>
+            <Text style={[styles.infoLabel, { color: colors.text }]}>Account Type</Text>
+            <Text style={[styles.infoValue, { color: colors.textSecondary }]}>
+              {user?.role ? (user.role.charAt(0).toUpperCase() + user.role.slice(1)) : 'Consumer'}
+            </Text>
+          </View>
+          
+          <View style={[styles.infoRow, { borderBottomColor: colors.border }]}>
+            <Text style={[styles.infoLabel, { color: colors.text }]}>Account Created</Text>
+            <Text style={[styles.infoValue, { color: colors.textSecondary }]}>
+              {formatDate(user?.created_at)}
+            </Text>
+          </View>
+        </View>
+
+        {/* Logout Button */}
+        <TouchableOpacity
+          style={[styles.logoutButton, { backgroundColor: colors.error }]}
+          onPress={handleLogout}
+        >
+          <Text style={styles.logoutButtonText}>Log Out</Text>
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
@@ -254,18 +348,18 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 20,
-    paddingTop: 10,
+    paddingTop: 40,
   },
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 6,
+    marginBottom: 8,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 16,
     textAlign: 'center',
-    marginBottom: 10,
+    marginBottom: 16,
   },
   loadingContainer: {
     flex: 1,
@@ -274,8 +368,8 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   loadingText: {
-    marginTop: 10,
     fontSize: 16,
+    marginTop: 12,
   },
   errorContainer: {
     flex: 1,
@@ -284,155 +378,123 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   errorText: {
-    marginTop: 10,
-    marginBottom: 20,
     fontSize: 16,
+    marginVertical: 12,
     textAlign: 'center',
   },
   retryButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
     borderRadius: 8,
+    marginTop: 16,
   },
   retryButtonText: {
-    color: 'white',
+    fontSize: 16,
     fontWeight: '600',
+    color: 'white',
   },
-  profileContainer: {
+  userInfoContainer: {
     padding: 16,
-  },
-  profileHeader: {
-    alignItems: 'center',
     borderRadius: 12,
-    paddingVertical: 24,
+    marginHorizontal: 16,
+    marginBottom: 20,
+  },
+  avatarContainer: {
+    alignItems: 'center',
     marginBottom: 16,
   },
-  profileAvatarContainer: {
-    marginBottom: 12,
-  },
-  profileAvatar: {
+  avatar: {
     width: 80,
     height: 80,
     borderRadius: 40,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 8,
   },
-  profileInitials: {
-    color: 'white',
-    fontSize: 30,
-    fontWeight: 'bold',
-  },
-  profileName: {
-    color: 'white',
-    fontSize: 22,
+  nameText: {
+    fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 4,
+    textAlign: 'center',
   },
-  profileRole: {
-    color: 'rgba(255, 255, 255, 0.8)',
+  emailText: {
     fontSize: 16,
+    marginBottom: 4,
+    textAlign: 'center',
   },
-  profileCard: {
+  phoneText: {
+    fontSize: 16,
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+  },
+  statusText: {
+    fontSize: 14,
+    marginLeft: 4,
+  },
+  section: {
     borderRadius: 12,
     padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  settingsCard: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
+    marginHorizontal: 16,
+    marginBottom: 20,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '600',
     marginBottom: 16,
+  },
+  themeOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+  },
+  selectedTheme: {
+    borderWidth: 2,
+  },
+  themeText: {
+    fontSize: 16,
+    flex: 1,
+    marginLeft: 12,
+    fontWeight: '500',
   },
   infoRow: {
     flexDirection: 'row',
-    marginBottom: 16,
-  },
-  infoIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 123, 0, 0.1)',
-    marginRight: 12,
-  },
-  infoContent: {
-    flex: 1,
-    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
   },
   infoLabel: {
-    fontSize: 14,
-    marginBottom: 2,
+    fontSize: 16,
+    flex: 1,
   },
   infoValue: {
     fontSize: 16,
     fontWeight: '500',
   },
-  settingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  settingContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  settingLabel: {
-    fontSize: 16,
-    marginLeft: 10,
-  },
-  themeToggle: {
-    width: 50,
-    height: 30,
-    borderRadius: 15,
-    padding: 5,
-  },
-  themeToggleHandle: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-  },
-  systemThemeButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    alignItems: 'center',
-  },
-  systemThemeText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
   logoutButton: {
-    flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 8,
-    paddingVertical: 12,
-    marginTop: 8,
-  },
-  logoutIcon: {
-    marginRight: 8,
+    justifyContent: 'center',
+    paddingVertical: 16,
+    marginHorizontal: 16,
+    marginTop: 24,
+    marginBottom: 40,
+    borderRadius: 12,
   },
   logoutButtonText: {
-    color: 'white',
     fontSize: 16,
     fontWeight: '600',
+    color: 'white',
   },
 });

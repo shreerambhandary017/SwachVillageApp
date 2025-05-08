@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, SafeAreaView, FlatList, ActivityIndicator, Touc
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../utils/ThemeContext';
 import { API_CONFIG } from '../utils/config';
-import { getUserData } from '../utils/auth';
+import { getUserData, getAuthToken } from '../utils/auth';
 
 // Feedback type definition
 type Feedback = {
@@ -27,26 +27,28 @@ export default function FeedbackScreen() {
   const fetchFeedback = async () => {
     try {
       setLoading(true);
+      const token = await getAuthToken();
       
-      // Get the current user data
-      const userData = await getUserData();
-      
-      if (!userData || !userData.id) {
-        throw new Error('User information not found');
+      if (!token) {
+        throw new Error('Authentication required');
       }
       
-      // Fetch feedback for the current user
-      const response = await fetch(`${API_CONFIG.API_URL}/consumer/feedback?user_id=${userData.id}`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch feedback');
-      }
+      const response = await fetch(`${API_CONFIG.API_URL}/consumer/feedback`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       
       const data = await response.json();
-      setFeedback(data.feedback || []);
-    } catch (error) {
+      
+      if (response.ok && data.success) {
+        setFeedback(data.feedback || []);
+      } else {
+        setError(data.message || 'Failed to fetch feedback');
+      }
+    } catch (error: any) {
       console.error('Error fetching feedback:', error);
-      setError('Unable to load feedback. Please try again later.');
+      setError(error.message || 'Could not load your feedback. Please try again later.');
     } finally {
       setLoading(false);
     }
