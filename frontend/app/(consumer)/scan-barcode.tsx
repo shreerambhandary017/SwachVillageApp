@@ -41,13 +41,13 @@ export default function ScanBarcodeScreen() {
         throw new Error('Authentication token not found');
       }
       
-      const response = await fetch(`${API_CONFIG.API_URL}/products/verify`, {
+      const response = await fetch(`${API_CONFIG.API_URL}/consumer/verify-product`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ barcode: data })
+        body: JSON.stringify({ product_code: data })
       });
       
       const result = await response.json();

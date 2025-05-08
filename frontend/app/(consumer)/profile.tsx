@@ -9,6 +9,7 @@ import {
   ScrollView,
   Alert
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../utils/ThemeContext';
@@ -57,15 +58,35 @@ export default function ProfileScreen() {
       
       // First try to get user profile from the API
       try {
+        console.log(`Fetching profile from: ${API_CONFIG.API_URL}/consumer/profile`);
+        
         const response = await fetch(`${API_CONFIG.API_URL}/consumer/profile`, {
+          method: 'GET',
           headers: {
-            'Authorization': `Bearer ${token}`
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
           }
         });
         
-        const data = await response.json();
+        console.log('API Response status:', response.status);
+        
+        // Get the response text first for debugging
+        const responseText = await response.text();
+        console.log('API Response text:', responseText);
+        
+        // Parse the response (if it's valid JSON)
+        let data;
+        try {
+          data = JSON.parse(responseText);
+        } catch (parseError) {
+          console.error('Failed to parse response as JSON:', parseError);
+          throw new Error('Invalid response format from server');
+        }
         
         if (response.ok && data.success) {
+          console.log('Successfully loaded user profile from API');
+          
           // Ensure data.user conforms to our ExtendedUser type
           const userProfile: ExtendedUser = {
             id: data.user.id,
@@ -78,18 +99,30 @@ export default function ProfileScreen() {
             created_at: data.user.created_at || new Date().toISOString(),
             profile_completed: Boolean(data.user.profile_completed)
           };
+          
+          // Save to storage for future use
+          await AsyncStorage.setItem('user_data', JSON.stringify(userProfile));
+          
           setUser(userProfile);
           return;
+        } else {
+          console.warn('API returned unsuccessful response:', data);
+          throw new Error(data.message || 'Failed to load profile from server');
         }
-      } catch (apiError) {
-        console.log('API fetch failed, falling back to local storage');
+      } catch (apiError: any) {
+        console.warn('API fetch failed, falling back to local storage:', apiError.message);
       }
       
       // Fallback to local storage if API fails
+      console.log('Attempting to get user data from local storage');
       const userData = await getUserData();
+      
       if (!userData) {
+        console.error('No user data found in local storage');
         throw new Error('User data not available');
       }
+      
+      console.log('Successfully loaded user data from local storage');
       
       // Ensure the stored user data matches our ExtendedUser type
       const userFromStorage: ExtendedUser = {
@@ -106,7 +139,7 @@ export default function ProfileScreen() {
       
       setUser(userFromStorage);
     } catch (error: any) {
-      console.error('Error loading user data:', error);
+      console.error('Error loading user data:', error.message);
       setError(error.message || 'Failed to load user data');
     } finally {
       setLoading(false);
@@ -196,31 +229,51 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>Settings</Text>
+      <View style={[styles.header, { backgroundColor: colors.surface }]}>
+        <View style={styles.headerContent}>
+          <TouchableOpacity 
+            style={[styles.backButton, { backgroundColor: theme === 'dark' ? colors.surface : colors.background }]} 
+            onPress={() => router.back()}
+          >
+            <Ionicons name="chevron-back" size={22} color={colors.primary} />
+          </TouchableOpacity>
+          <Text style={[styles.title, { color: colors.text }]}>Profile</Text>
+          <TouchableOpacity 
+            style={[styles.refreshButton, { backgroundColor: theme === 'dark' ? colors.surface : colors.background }]} 
+            onPress={handleRefresh}
+          >
+            <Ionicons name="refresh" size={22} color={colors.primary} />
+          </TouchableOpacity>
         </View>
+      </View>
 
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        bounces={true}
+      >
         {user && (
-          <View style={[styles.userInfoContainer, { backgroundColor: colors.primary }]}>
+          <View style={[styles.userInfoContainer, { backgroundColor: colors.surface }]}>
             <View style={styles.avatarContainer}>
-              <View style={styles.avatar}>
-                <Ionicons name="person" size={40} color="white" />
+              <View style={[styles.avatar, { backgroundColor: colors.primary + '20' }]}>
+                <Ionicons name="person" size={40} color={colors.primary} />
               </View>
-              <Text style={[styles.nameText, { color: 'white' }]}>{user.name}</Text>
-              <Text style={[styles.emailText, { color: 'rgba(255, 255, 255, 0.8)' }]}>{user.email}</Text>
-              {user.phone && (
-                <Text style={[styles.phoneText, { color: 'rgba(255, 255, 255, 0.8)' }]}>{user.phone}</Text>
-              )}
-              <View style={styles.statusContainer}>
-                <Ionicons
-                  name={user.is_verified ? 'checkmark-circle' : 'alert-circle'}
-                  size={16}
-                  color={user.is_verified ? 'white' : 'yellow'}
-                />
-                <Text style={[styles.statusText, { color: 'white' }]}>
-                  {user.is_verified ? 'Verified Account' : 'Unverified Account'}
-                </Text>
+              <View style={styles.userTextContainer}>
+                <Text style={[styles.nameText, { color: colors.text }]}>{user.name}</Text>
+                <Text style={[styles.emailText, { color: colors.textSecondary }]}>{user.email}</Text>
+                {user.phone && (
+                  <Text style={[styles.phoneText, { color: colors.textSecondary }]}>{user.phone}</Text>
+                )}
+                <View style={styles.statusContainer}>
+                  <Ionicons
+                    name={user.is_verified ? 'shield-checkmark' : 'alert-circle'}
+                    size={16}
+                    color={user.is_verified ? colors.success : colors.warning}
+                  />
+                  <Text style={[styles.statusText, { color: user.is_verified ? colors.success : colors.warning }]}>
+                    {user.is_verified ? 'Verified Account' : 'Verification Pending'}
+                  </Text>
+                </View>
               </View>
             </View>
           </View>
@@ -228,110 +281,176 @@ export default function ProfileScreen() {
 
         {/* Theme Selection */}
         <View style={[styles.section, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Appearance</Text>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Appearance</Text>
+            <Ionicons name="color-palette-outline" size={20} color={colors.primary} />
+          </View>
           
-          <TouchableOpacity 
-            style={[
-              styles.themeOption, 
-              currentTheme === 'light' ? styles.selectedTheme : null, 
-              { borderColor: colors.primary }
-            ]}
-            onPress={() => handleThemeChange('light')}
-          >
-            <Ionicons 
-              name="sunny" 
-              size={24} 
-              color={currentTheme === 'light' ? colors.primary : colors.textSecondary} 
-            />
-            <Text 
+          <View style={styles.themeOptionsContainer}>
+            <TouchableOpacity 
               style={[
-                styles.themeText, 
-                { color: currentTheme === 'light' ? colors.primary : colors.text }
+                styles.themeOption, 
+                currentTheme === 'light' ? [styles.selectedTheme, { borderColor: colors.primary, backgroundColor: colors.primary + '10' }] : { borderColor: colors.border }
               ]}
+              onPress={() => handleThemeChange('light')}
             >
-              Light
-            </Text>
-            {currentTheme === 'light' && <Ionicons name="checkmark-circle" size={18} color={colors.primary} />}
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[
-              styles.themeOption, 
-              currentTheme === 'dark' ? styles.selectedTheme : null, 
-              { borderColor: colors.primary }
-            ]}
-            onPress={() => handleThemeChange('dark')}
-          >
-            <Ionicons 
-              name="moon" 
-              size={24} 
-              color={currentTheme === 'dark' ? colors.primary : colors.textSecondary} 
-            />
-            <Text 
+              <View style={styles.themeIconContainer}>
+                <Ionicons 
+                  name="sunny" 
+                  size={24} 
+                  color={currentTheme === 'light' ? colors.primary : colors.textSecondary} 
+                />
+              </View>
+              <Text 
+                style={[
+                  styles.themeText, 
+                  { color: currentTheme === 'light' ? colors.primary : colors.text }
+                ]}
+              >
+                Light
+              </Text>
+              {currentTheme === 'light' && 
+                <View style={[styles.checkmarkContainer, {backgroundColor: colors.primary}]}>
+                  <Ionicons name="checkmark" size={16} color="white" />
+                </View>
+              }
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
               style={[
-                styles.themeText, 
-                { color: currentTheme === 'dark' ? colors.primary : colors.text }
+                styles.themeOption, 
+                currentTheme === 'dark' ? [styles.selectedTheme, { borderColor: colors.primary, backgroundColor: colors.primary + '10' }] : { borderColor: colors.border }
               ]}
+              onPress={() => handleThemeChange('dark')}
             >
-              Dark
-            </Text>
-            {currentTheme === 'dark' && <Ionicons name="checkmark-circle" size={18} color={colors.primary} />}
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[
-              styles.themeOption, 
-              currentTheme === 'system' ? styles.selectedTheme : null, 
-              { borderColor: colors.primary }
-            ]}
-            onPress={() => handleThemeChange('system')}
-          >
-            <Ionicons 
-              name="phone-portrait" 
-              size={24} 
-              color={currentTheme === 'system' ? colors.primary : colors.textSecondary} 
-            />
-            <Text 
+              <View style={styles.themeIconContainer}>
+                <Ionicons 
+                  name="moon" 
+                  size={24} 
+                  color={currentTheme === 'dark' ? colors.primary : colors.textSecondary} 
+                />
+              </View>
+              <Text 
+                style={[
+                  styles.themeText, 
+                  { color: currentTheme === 'dark' ? colors.primary : colors.text }
+                ]}
+              >
+                Dark
+              </Text>
+              {currentTheme === 'dark' && 
+                <View style={[styles.checkmarkContainer, {backgroundColor: colors.primary}]}>
+                  <Ionicons name="checkmark" size={16} color="white" />
+                </View>
+              }
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
               style={[
-                styles.themeText, 
-                { color: currentTheme === 'system' ? colors.primary : colors.text }
+                styles.themeOption, 
+                currentTheme === 'system' ? [styles.selectedTheme, { borderColor: colors.primary, backgroundColor: colors.primary + '10' }] : { borderColor: colors.border }
               ]}
+              onPress={() => handleThemeChange('system')}
             >
-              System
-            </Text>
-            {currentTheme === 'system' && <Ionicons name="checkmark-circle" size={18} color={colors.primary} />}
-          </TouchableOpacity>
+              <View style={styles.themeIconContainer}>
+                <Ionicons 
+                  name="phone-portrait" 
+                  size={24} 
+                  color={currentTheme === 'system' ? colors.primary : colors.textSecondary} 
+                />
+              </View>
+              <Text 
+                style={[
+                  styles.themeText, 
+                  { color: currentTheme === 'system' ? colors.primary : colors.text }
+                ]}
+              >
+                System
+              </Text>
+              {currentTheme === 'system' && 
+                <View style={[styles.checkmarkContainer, {backgroundColor: colors.primary}]}>
+                  <Ionicons name="checkmark" size={16} color="white" />
+                </View>
+              }
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Info Section */}
         <View style={[styles.section, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>About</Text>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Account Information</Text>
+            <Ionicons name="information-circle-outline" size={20} color={colors.primary} />
+          </View>
           
           <View style={[styles.infoRow, { borderBottomColor: colors.border }]}>
+            <View style={styles.infoIconContainer}>
+              <Ionicons name="apps" size={18} color={colors.primary} />
+            </View>
             <Text style={[styles.infoLabel, { color: colors.text }]}>App Version</Text>
             <Text style={[styles.infoValue, { color: colors.textSecondary }]}>1.0.0</Text>
           </View>
           
           <View style={[styles.infoRow, { borderBottomColor: colors.border }]}>
+            <View style={styles.infoIconContainer}>
+              <Ionicons name="person-outline" size={18} color={colors.primary} />
+            </View>
             <Text style={[styles.infoLabel, { color: colors.text }]}>Account Type</Text>
-            <Text style={[styles.infoValue, { color: colors.textSecondary }]}>
-              {user?.role ? (user.role.charAt(0).toUpperCase() + user.role.slice(1)) : 'Consumer'}
-            </Text>
+            <View style={[styles.accountTypeBadge, { backgroundColor: colors.primary + '15' }]}>
+              <Text style={[styles.accountTypeText, { color: colors.primary }]}>
+                {user?.role ? (user.role.charAt(0).toUpperCase() + user.role.slice(1)) : 'Consumer'}
+              </Text>
+            </View>
           </View>
           
           <View style={[styles.infoRow, { borderBottomColor: colors.border }]}>
+            <View style={styles.infoIconContainer}>
+              <Ionicons name="calendar-outline" size={18} color={colors.primary} />
+            </View>
             <Text style={[styles.infoLabel, { color: colors.text }]}>Account Created</Text>
             <Text style={[styles.infoValue, { color: colors.textSecondary }]}>
               {formatDate(user?.created_at)}
             </Text>
           </View>
         </View>
+        
+        {/* Contact Support */}
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Support</Text>
+            <Ionicons name="help-buoy-outline" size={20} color={colors.primary} />
+          </View>
+          
+          <TouchableOpacity style={styles.supportRow}>
+            <View style={styles.supportIconContainer}>
+              <Ionicons name="help-circle-outline" size={22} color={colors.primary} />
+            </View>
+            <View style={styles.supportTextContainer}>
+              <Text style={[styles.supportTitle, { color: colors.text }]}>Help Center</Text>
+              <Text style={[styles.supportDescription, { color: colors.textSecondary }]}>FAQ and user guides</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.supportRow}>
+            <View style={styles.supportIconContainer}>
+              <Ionicons name="mail-outline" size={22} color={colors.primary} />
+            </View>
+            <View style={styles.supportTextContainer}>
+              <Text style={[styles.supportTitle, { color: colors.text }]}>Contact Us</Text>
+              <Text style={[styles.supportDescription, { color: colors.textSecondary }]}>Get in touch with our team</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
 
         {/* Logout Button */}
         <TouchableOpacity
-          style={[styles.logoutButton, { backgroundColor: colors.error }]}
+          style={[styles.logoutButton, { backgroundColor: colors.error + 'DD' }]}
           onPress={handleLogout}
+          activeOpacity={0.8}
         >
+          <Ionicons name="log-out-outline" size={18} color="white" style={{marginRight: 8}} />
           <Text style={styles.logoutButtonText}>Log Out</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -345,15 +464,54 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
+    paddingBottom: 20,
   },
   header: {
-    padding: 20,
-    paddingTop: 40,
+    paddingTop: 50,
+    paddingBottom: 15,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+    zIndex: 10,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginBottom: 10,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  refreshButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   title: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 8,
     textAlign: 'center',
   },
   subtitle: {
@@ -394,70 +552,94 @@ const styles = StyleSheet.create({
     color: 'white',
   },
   userInfoContainer: {
-    padding: 16,
-    borderRadius: 12,
+    padding: 20,
+    borderRadius: 16,
     marginHorizontal: 16,
+    marginTop: 16,
     marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
   },
   avatarContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
   },
   avatar: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
+    marginRight: 16,
+  },
+  userTextContainer: {
+    flex: 1,
   },
   nameText: {
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 4,
-    textAlign: 'center',
   },
   emailText: {
     fontSize: 16,
     marginBottom: 4,
-    textAlign: 'center',
   },
   phoneText: {
     fontSize: 16,
     marginBottom: 4,
-    textAlign: 'center',
   },
   statusContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     marginTop: 8,
   },
   statusText: {
     fontSize: 14,
     marginLeft: 4,
+    fontWeight: '500',
   },
   section: {
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16,
+    padding: 20,
     marginHorizontal: 16,
     marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    marginBottom: 16,
+  },
+  themeOptionsContainer: {
+    marginTop: 8,
   },
   themeOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
+    paddingVertical: 16,
     paddingHorizontal: 16,
-    borderRadius: 8,
-    marginBottom: 8,
+    borderRadius: 12,
+    marginBottom: 12,
     borderWidth: 1,
+  },
+  themeIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   selectedTheme: {
     borderWidth: 2,
@@ -468,12 +650,27 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     fontWeight: '500',
   },
+  checkmarkContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 4,
     borderBottomWidth: 1,
+  },
+  infoIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
   infoLabel: {
     fontSize: 16,
@@ -483,7 +680,42 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
+  accountTypeBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+  },
+  accountTypeText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  supportRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    marginBottom: 4,
+  },
+  supportIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  supportTextContainer: {
+    flex: 1,
+  },
+  supportTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  supportDescription: {
+    fontSize: 14,
+  },
   logoutButton: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 16,

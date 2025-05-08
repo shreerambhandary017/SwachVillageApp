@@ -89,76 +89,128 @@ export default function ConsumerDashboard() {
     return stars;
   };
 
-  const renderBusinessItem = ({ item }: { item: Business }) => (
-    <View style={[styles.businessCard, { backgroundColor: colors.surface }]}>
-      <View style={styles.businessLogoContainer}>
-        {item.logo_url ? (
-          <Image source={{ uri: item.logo_url }} style={styles.businessLogo} />
-        ) : (
-          <View style={[styles.businessLogoPlaceholder, { backgroundColor: colors.primary }]}>
-            <Ionicons name="business-outline" size={24} color="white" />
+  const  renderBusinessItem = ({ item }: { item: Business }) => (
+    <TouchableOpacity 
+      style={[styles.businessCard, { backgroundColor: colors.surface }]}
+      activeOpacity={0.7}
+      onPress={() => {
+        // Navigate to business details when implemented
+        // For now, just show a feedback message
+        console.log(`Selected business: ${item.business_name}`);
+      }}
+    >
+      <View style={styles.businessContent}>
+        <View style={styles.businessLogoContainer}>
+          {item.logo_url ? (
+            <Image source={{ uri: item.logo_url }} style={styles.businessLogo} resizeMode="cover" />
+          ) : (
+            <View style={[styles.businessLogoPlaceholder, { backgroundColor: colors.primary + '20' }]}>
+              <Ionicons name="business-outline" size={24} color={colors.primary} />
+            </View>
+          )}
+        </View>
+        <View style={styles.businessInfo}>
+          <View style={styles.businessNameRow}>
+            <Text style={[styles.businessName, { color: colors.text }]}>{item.business_name}</Text>
+            {item.certification_status === 'certified' && (
+              <Ionicons name="checkmark-circle" size={16} color={colors.success} style={styles.verifiedIcon} />
+            )}
           </View>
-        )}
-      </View>
-      <View style={styles.businessInfo}>
-        <Text style={[styles.businessName, { color: colors.text }]}>{item.business_name}</Text>
-        <Text style={[styles.businessDescription, { color: colors.textSecondary }]} numberOfLines={2}>
-          {item.description || 'Certified clean and cruelty-free business'}
-        </Text>
-        <View style={styles.ratingContainer}>
-          {renderRatingStars(item.rating)}
-          <Text style={[styles.ratingText, { color: colors.textSecondary }]}>({item.rating.toFixed(1)})</Text>
+          <Text style={[styles.businessDescription, { color: colors.textSecondary }]} numberOfLines={2}>
+            {item.description || 'Certified clean and cruelty-free business'}
+          </Text>
+          <View style={styles.businessFooter}>
+            <View style={styles.ratingContainer}>
+              {renderRatingStars(item.rating)}
+              <Text style={[styles.ratingText, { color: colors.textSecondary }]}>({item.rating.toFixed(1)})</Text>
+            </View>
+            <View style={[styles.categoryTag, { backgroundColor: colors.primary + '15' }]}>
+              <Text style={[styles.categoryText, { color: colors.primary }]}>Eco-friendly</Text>
+            </View>
+          </View>
         </View>
       </View>
-    </View>
+      <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} style={styles.cardArrow} />
+    </TouchableOpacity>
   );
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>Swach Village</Text>
-        <TouchableOpacity style={[styles.profileButton, { backgroundColor: colors.primary }]} onPress={() => router.push('/profile')}>
-          <Ionicons name="person" size={20} color="white" />
-        </TouchableOpacity>
-      </View>
-
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading businesses...</Text>
-        </View>
-      ) : error ? (
-        <View style={styles.errorContainer}>
-          <Ionicons name="alert-circle-outline" size={40} color={colors.error} />
-          <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
-          <TouchableOpacity
-            style={[styles.retryButton, { backgroundColor: colors.primary }]}
-            onPress={fetchBusinesses}
+      <View style={[styles.header, { backgroundColor: colors.surface }]}>
+        <View style={styles.headerContent}>
+          <View style={styles.titleContainer}>
+            <Ionicons name="leaf" size={24} color={colors.primary} style={styles.titleIcon} />
+            <Text style={[styles.title, { color: colors.text }]}>Swach Village</Text>
+          </View>
+          <TouchableOpacity 
+            style={[styles.profileButton, { backgroundColor: theme === 'dark' ? colors.surface : colors.background }]} 
+            onPress={() => router.push('/profile')}
           >
-            <Text style={styles.retryButtonText}>Try Again</Text>
+            <Ionicons name="person" size={20} color={colors.primary} />
           </TouchableOpacity>
         </View>
-      ) : businesses.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="business-outline" size={40} color={colors.textSecondary} />
-          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No certified businesses found</Text>
+        
+        <View style={styles.searchContainer}>
+          <View style={[styles.searchBar, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}>
+            <Ionicons name="search" size={20} color={colors.textSecondary} style={styles.searchIcon} />
+            <Text style={[styles.searchPlaceholder, { color: colors.textSecondary }]}>Search eco-friendly businesses...</Text>
+          </View>
         </View>
-      ) : (
-        <FlatList
-          data={businesses}
-          renderItem={renderBusinessItem}
-          keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.listContainer}
-          showsVerticalScrollIndicator={false}
-          ListHeaderComponent={
-            <View style={styles.listHeader}>
-              <Text style={[styles.sectionTitle, { color: colors.primary }]}>
-                Certified Eco-Friendly Businesses
-              </Text>
-            </View>
-          }
-        />
+      </View>
+
+      <View style={styles.mainContent}>
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading businesses...</Text>
+          </View>
+        ) : error ? (
+          <View style={styles.errorContainer}>
+            <Ionicons name="alert-circle-outline" size={40} color={colors.error} />
+            <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
+            <TouchableOpacity
+              style={[styles.retryButton, { backgroundColor: colors.primary }]}
+              onPress={fetchBusinesses}
+            >
+              <Text style={styles.retryButtonText}>Try Again</Text>
+            </TouchableOpacity>
+          </View>
+        ) : businesses.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="business-outline" size={40} color={colors.textSecondary} />
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No certified businesses found</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={businesses}
+            renderItem={renderBusinessItem}
+            keyExtractor={(item) => item.id.toString()}
+            contentContainerStyle={styles.listContainer}
+            ListHeaderComponent={
+              <View style={styles.listHeader}>
+                <View style={styles.sectionHeaderRow}>
+                  <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                    Certified Businesses
+                  </Text>
+                  <View style={[styles.certificationBadge, { backgroundColor: colors.primary + '20' }]}>
+                    <Ionicons name="shield-checkmark" size={14} color={colors.primary} />
+                    <Text style={[styles.certificationText, { color: colors.primary }]}>Swach Verified</Text>
+                  </View>
+                </View>
+                
+                <Text style={[styles.sectionDescription, { color: colors.textSecondary }]}>
+                  Eco-friendly, cruelty-free businesses committed to sustainability
+                </Text>
+              </View>
+            }
+            refreshing={loading}
+            onRefresh={fetchBusinesses}
+            bounces={true}
+            showsVerticalScrollIndicator={false}
+            fadingEdgeLength={50}
+          />
       )}
+      </View>
     </SafeAreaView>
   );
 }
@@ -168,17 +220,34 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
+    paddingTop: 50,
+    paddingBottom: 15,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+    zIndex: 10,
+  },
+  headerContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
-    paddingTop: 50,
     paddingHorizontal: 20,
+    marginBottom: 10,
+  },
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  titleIcon: {
+    marginRight: 10,
   },
   title: {
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: 'bold',
-    marginBottom: 0,
   },
   profileButton: {
     width: 40,
@@ -186,11 +255,31 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
+    elevation: 2,
+  },
+  searchContainer: {
+    paddingHorizontal: 20,
+    marginTop: 5,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 45,
+    borderRadius: 22,
+    paddingHorizontal: 15,
+  },
+  searchIcon: {
+    marginRight: 10,
+  },
+  searchPlaceholder: {
+    fontSize: 14,
+  },
+  mainContent: {
+    flex: 1,
   },
   loadingContainer: {
     flex: 1,
@@ -210,17 +299,19 @@ const styles = StyleSheet.create({
   },
   errorText: {
     marginTop: 10,
-    marginBottom: 20,
     fontSize: 16,
     textAlign: 'center',
+    marginBottom: 20,
   },
   retryButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
     borderRadius: 8,
+    marginTop: 16,
   },
   retryButtonText: {
     color: 'white',
+    fontSize: 16,
     fontWeight: '600',
   },
   emptyContainer: {
@@ -230,64 +321,107 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   emptyText: {
-    marginTop: 10,
-    fontSize: 16,
+    fontSize: 18,
     textAlign: 'center',
+    marginTop: 10,
   },
   listContainer: {
     padding: 16,
-    paddingTop: 0,
+    paddingTop: 8,
   },
   listHeader: {
     marginBottom: 16,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 4,
   },
+  sectionDescription: {
+    fontSize: 14,
+    marginBottom: 16,
+  },
   sectionSubtitle: {
     fontSize: 14,
     marginBottom: 16,
   },
-  businessCard: {
+  certificationBadge: {
     flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: 12,
+  },
+  certificationText: {
+    fontSize: 12,
+    marginLeft: 4,
+    fontWeight: '500',
+  },
+  businessCard: {
     marginBottom: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+    flexDirection: 'row',
     padding: 16,
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
     elevation: 2,
   },
+  businessContent: {
+    flex: 1,
+    flexDirection: 'row',
+  },
   businessLogoContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    overflow: 'hidden',
     marginRight: 16,
   },
   businessLogo: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: '100%',
+    height: '100%',
   },
   businessLogoPlaceholder: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: '100%',
+    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: 8,
   },
   businessInfo: {
     flex: 1,
-    justifyContent: 'center',
+  },
+  businessNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
   },
   businessName: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 4,
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginRight: 6,
+  },
+  verifiedIcon: {
+    marginLeft: 4,
   },
   businessDescription: {
     fontSize: 14,
-    marginBottom: 6,
+    marginBottom: 8,
+  },
+  businessFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   ratingContainer: {
     flexDirection: 'row',
@@ -297,7 +431,19 @@ const styles = StyleSheet.create({
     marginRight: 2,
   },
   ratingText: {
-    fontSize: 14,
+    fontSize: 12,
     marginLeft: 4,
+  },
+  categoryTag: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  categoryText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  cardArrow: {
+    marginLeft: 8,
   },
 });
