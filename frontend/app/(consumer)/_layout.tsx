@@ -70,7 +70,16 @@ export default function ConsumerLayout() {
           options={{
             title: "Home",
             tabBarIcon: ({ color, size }) => (
-              <Ionicons name="home" size={size+2} color={color} />
+              <Ionicons name="home-outline" size={size+2} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="verify"
+          options={{
+            title: "Verify",
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="shield-checkmark-outline" size={size+2} color={color} />
             ),
           }}
         />
@@ -79,7 +88,7 @@ export default function ConsumerLayout() {
           options={{
             title: "Feedback",
             tabBarIcon: ({ color, size }) => (
-              <Ionicons name="chatbubble" size={size+2} color={color} />
+              <Ionicons name="chatbubble-ellipses-outline" size={size+2} color={color} />
             ),
           }}
         />
@@ -88,7 +97,7 @@ export default function ConsumerLayout() {
           options={{
             title: "Settings",
             tabBarIcon: ({ color, size }) => (
-              <Ionicons name="settings" size={size+2} color={color} />
+              <Ionicons name="settings-outline" size={size+2} color={color} />
             ),
           }}
         />
