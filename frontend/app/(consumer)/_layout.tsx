@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform } from "react-native";
-import { Tabs } from "expo-router";
+import { Tabs, useRouter, usePathname } from "expo-router";
 import { Ionicons } from '@expo/vector-icons';
 import { ProtectedRoute } from "../utils/protectedRoute";
 import { useTheme } from "../utils/ThemeContext";
@@ -24,6 +24,17 @@ const getHeaderTitle = (route: any) => {
 
 export default function ConsumerLayout() {
   const { colors, theme, setTheme } = useTheme();
+  const router = useRouter();
+  const pathname = usePathname();
+  
+  // Prevent direct access to scan-barcode and product-details screens
+  useEffect(() => {
+    // Check if current path is one of the removed screens
+    if (pathname === '/scan-barcode' || pathname === '/product-details') {
+      // Redirect to verify screen
+      router.replace('/verify');
+    }
+  }, [pathname]);
   
   return (
     <ProtectedRoute allowedRoles={['consumer']}>
