@@ -785,8 +785,8 @@ export default function CertificationScreen() {
         <Switch
           value={form.vendorCertified}
           onValueChange={(value) => updateField('vendorCertified', value)}
-          trackColor={{ false: '#767577', true: '#81b0ff' }}
-          thumbColor={form.vendorCertified ? '#3498db' : '#f4f3f4'}
+          trackColor={{ false: '#FFC107', true: '#FFA07A' }}
+          thumbColor={form.vendorCertified ? '#FF8C00' : '#f4f3f4'}
         />
       </View>
       
@@ -871,8 +871,8 @@ export default function CertificationScreen() {
         <Switch
           value={form.sanitationPractices}
           onValueChange={(value) => updateField('sanitationPractices', value)}
-          trackColor={{ false: '#767577', true: '#81b0ff' }}
-          thumbColor={form.sanitationPractices ? '#3498db' : '#f4f3f4'}
+          trackColor={{ false: '#E0E0E0', true: '#FFBB80' }}
+          thumbColor={form.sanitationPractices ? '#FF7A00' : '#f4f3f4'}
         />
       </View>
       
@@ -881,8 +881,8 @@ export default function CertificationScreen() {
         <Switch
           value={form.wasteManagement}
           onValueChange={(value) => updateField('wasteManagement', value)}
-          trackColor={{ false: '#767577', true: '#81b0ff' }}
-          thumbColor={form.wasteManagement ? '#3498db' : '#f4f3f4'}
+          trackColor={{ false: '#E0E0E0', true: '#FFBB80' }}
+          thumbColor={form.wasteManagement ? '#FF7A00' : '#f4f3f4'}
         />
       </View>
     </View>
@@ -897,8 +897,8 @@ export default function CertificationScreen() {
         <Switch
           value={form.isVegetarian}
           onValueChange={(value) => updateField('isVegetarian', value)}
-          trackColor={{ false: '#767577', true: '#81b0ff' }}
-          thumbColor={form.isVegetarian ? '#3498db' : '#f4f3f4'}
+          trackColor={{ false: '#E0E0E0', true: '#FFBB80' }}
+          thumbColor={form.isVegetarian ? '#FF7A00' : '#f4f3f4'}
         />
       </View>
       
@@ -907,8 +907,8 @@ export default function CertificationScreen() {
         <Switch
           value={form.isVegan}
           onValueChange={(value) => updateField('isVegan', value)}
-          trackColor={{ false: '#767577', true: '#81b0ff' }}
-          thumbColor={form.isVegan ? '#3498db' : '#f4f3f4'}
+          trackColor={{ false: '#E0E0E0', true: '#FFBB80' }}
+          thumbColor={form.isVegan ? '#FF7A00' : '#f4f3f4'}
         />
       </View>
       
@@ -917,8 +917,8 @@ export default function CertificationScreen() {
         <Switch
           value={form.isCrueltyFree}
           onValueChange={(value) => updateField('isCrueltyFree', value)}
-          trackColor={{ false: '#767577', true: '#81b0ff' }}
-          thumbColor={form.isCrueltyFree ? '#3498db' : '#f4f3f4'}
+          trackColor={{ false: '#E0E0E0', true: '#FFBB80' }}
+          thumbColor={form.isCrueltyFree ? '#FF7A00' : '#f4f3f4'}
         />
       </View>
     </View>
@@ -1038,13 +1038,13 @@ export default function CertificationScreen() {
             )}
           </View>
           
-          {/* Skip and go to home button */}
+          {/* Resume Later button */}
           <TouchableOpacity
-            style={styles.skipToHomeButton}
+            style={styles.resumeLaterButton}
             onPress={saveAndGoHome}
             disabled={loading}
           >
-            <Text style={styles.skipToHomeButtonText}>Skip and go to home</Text>
+            <Text style={styles.resumeLaterButtonText}>Resume Later</Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -1056,6 +1056,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+    paddingTop: 10,
   },
   keyboardAvoidView: {
     flex: 1,
@@ -1082,7 +1083,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#FF7A00',
     marginBottom: 8,
   },
   subtitle: {
@@ -1103,7 +1104,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ddd',
   },
   activeStepDot: {
-    backgroundColor: '#3498db',
+    backgroundColor: '#FF7A00',
   },
   stepLine: {
     flex: 1,
@@ -1112,15 +1113,15 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
   },
   activeStepLine: {
-    backgroundColor: '#3498db',
+    backgroundColor: '#FF7A00',
   },
   stepContainer: {
     marginBottom: 20,
   },
   stepTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#FF7A00',
     marginBottom: 15,
   },
   form: {
@@ -1142,6 +1143,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     borderWidth: 1,
     borderColor: '#ddd',
+    color: '#333',
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
   },
   textArea: {
     height: 120,
@@ -1170,8 +1177,8 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
   },
   activeRatingButton: {
-    backgroundColor: '#3498db',
-    borderColor: '#3498db',
+    backgroundColor: '#FF7A00',
+    borderColor: '#FF7A00',
   },
   ratingText: {
     fontSize: 16,
@@ -1236,24 +1243,31 @@ const styles = StyleSheet.create({
   },
   backButton: {
     flex: 1,
-    backgroundColor: '#eee',
+    backgroundColor: '#f5f5f5',
     borderRadius: 8,
     padding: 15,
     alignItems: 'center',
     marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
   },
   backButtonText: {
-    color: '#333',
+    color: '#FF7A00',
     fontSize: 16,
     fontWeight: '600',
   },
   skipButton: {
     flex: 1,
-    backgroundColor: '#f1c40f',
+    backgroundColor: '#FF9E44',
     borderRadius: 8,
     padding: 15,
     alignItems: 'center',
     marginRight: 8,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   skipButtonText: {
     color: '#fff',
@@ -1262,15 +1276,39 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     flex: 2,
-    backgroundColor: '#3498db',
+    backgroundColor: '#FF7A00',
     borderRadius: 8,
     padding: 15,
     alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   submitButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  resumeLaterButton: {
+    backgroundColor: '#FF7A00',
+    borderRadius: 8,
+    padding: 15,
+    alignItems: 'center',
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#E66B00',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  resumeLaterButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   skipToHomeButton: {
     backgroundColor: '#f0ad4e',

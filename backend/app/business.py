@@ -519,14 +519,15 @@ def get_business_feedback(user_id, role):
         cursor.execute("""
             SELECT 
                 COUNT(*) as total_feedback,
-                AVG(rating) as average_rating,
-                SUM(CASE WHEN rating = 5 THEN 1 ELSE 0 END) as five_star,
-                SUM(CASE WHEN rating = 4 THEN 1 ELSE 0 END) as four_star,
-                SUM(CASE WHEN rating = 3 THEN 1 ELSE 0 END) as three_star,
-                SUM(CASE WHEN rating = 2 THEN 1 ELSE 0 END) as two_star,
-                SUM(CASE WHEN rating = 1 THEN 1 ELSE 0 END) as one_star
-            FROM feedback
-            WHERE business_id = %s
+                COALESCE(AVG(f.rating), 0) as average_rating,
+                SUM(CASE WHEN f.rating = 5 THEN 1 ELSE 0 END) as five_star,
+                SUM(CASE WHEN f.rating = 4 THEN 1 ELSE 0 END) as four_star,
+                SUM(CASE WHEN f.rating = 3 THEN 1 ELSE 0 END) as three_star,
+                SUM(CASE WHEN f.rating = 2 THEN 1 ELSE 0 END) as two_star,
+                SUM(CASE WHEN f.rating = 1 THEN 1 ELSE 0 END) as one_star
+            FROM feedback f
+            JOIN products p ON f.product_id = p.id
+            WHERE p.business_id = %s
         """, (user_id,))
         
         columns = [col[0] for col in cursor.description]
@@ -538,16 +539,24 @@ def get_business_feedback(user_id, role):
         
         # Create summary data
         summary = {
-            'total_feedback': stats['total_feedback'] or 0,
-            'average_rating': float(stats['average_rating']) if stats['average_rating'] else 0,
+            'total_feedback': stats['total_feedback'] if stats and stats['total_feedback'] is not None else 0,
+            'average_rating': 0,  # Default value
             'rating_distribution': {
-                '5': stats['five_star'] or 0,
-                '4': stats['four_star'] or 0,
-                '3': stats['three_star'] or 0,
-                '2': stats['two_star'] or 0,
-                '1': stats['one_star'] or 0
+                '5': stats['five_star'] if stats and stats['five_star'] is not None else 0,
+                '4': stats['four_star'] if stats and stats['four_star'] is not None else 0,
+                '3': stats['three_star'] if stats and stats['three_star'] is not None else 0,
+                '2': stats['two_star'] if stats and stats['two_star'] is not None else 0,
+                '1': stats['one_star'] if stats and stats['one_star'] is not None else 0
             }
         }
+        
+        # Safely convert average_rating to float
+        if stats and stats['average_rating'] is not None:
+            try:
+                summary['average_rating'] = float(stats['average_rating'])
+            except (ValueError, TypeError):
+                print(f"Warning: Could not convert average_rating value to float: {stats['average_rating']}")
+                summary['average_rating'] = 0
         
         return jsonify({
             'feedback': feedback_data,
