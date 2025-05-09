@@ -63,6 +63,10 @@ export const loginUser = async (credentials: LoginCredentials): Promise<AuthResp
       throw new Error(data.message || 'Login failed');
     }
 
+    // Reset the logout flag since user is explicitly logging in
+    resetLogoutFlag();
+    console.log('Login: Reset logout flag');
+
     // Store auth data in AsyncStorage
     await storeAuthData(data);
     return data;
@@ -120,30 +124,69 @@ export const verifyToken = async (): Promise<{ valid: boolean; user?: User }> =>
   }
 };
 
-export const logoutUser = async (): Promise<void> => {
+// Flag to track if user manually logged out
+let userLoggedOut = false;
+
+/**
+ * Check if logout was manually triggered by the user
+ * This helps navigation components distinguish between session expiry and manual logout
+ */
+export const isUserLoggedOut = (): boolean => {
+  return userLoggedOut;
+};
+
+/**
+ * Reset the logout flag - typically called when a user successfully logs in
+ */
+export const resetLogoutFlag = (): void => {
+  userLoggedOut = false;
+};
+
+/**
+ * Enhanced logout function that ensures complete removal of auth data
+ */
+export const logoutUser = async (): Promise<boolean> => {
   try {
-    console.log('Attempting to clear all auth data...');
+    console.log('Performing complete logout procedure');
     
-    // Clear specific auth keys
+    // Set the logout flag to true
+    userLoggedOut = true;
+    
+    // Step 1: Clear specific authentication keys
     await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, USER_DATA_KEY]);
     
-    // For more thorough cleanup, get all keys and remove any auth-related ones
+    // Step 2: Identify and clear any auth-related keys that might still exist
     const allKeys = await AsyncStorage.getAllKeys();
-    const additionalAuthKeys = allKeys.filter(key => 
+    const authRelatedKeys = allKeys.filter(key => 
+      key === AUTH_TOKEN_KEY || 
+      key === USER_DATA_KEY || 
       key.toLowerCase().includes('auth') || 
-      key.toLowerCase().includes('token') || 
-      key.toLowerCase().includes('user')
+      key.toLowerCase().includes('token')
     );
     
-    if (additionalAuthKeys.length > 0) {
-      console.log('Found additional auth keys to remove:', additionalAuthKeys);
-      await AsyncStorage.multiRemove(additionalAuthKeys);
+    if (authRelatedKeys.length > 0) {
+      console.log('Found additional auth-related keys to clear:', authRelatedKeys);
+      await AsyncStorage.multiRemove(authRelatedKeys);
     }
     
-    console.log('Auth data cleared successfully');
+    // Step 3: Verification check
+    const remainingAuthKeys = (await AsyncStorage.getAllKeys()).filter(key => 
+      key === AUTH_TOKEN_KEY || 
+      key === USER_DATA_KEY || 
+      key.toLowerCase().includes('auth') || 
+      key.toLowerCase().includes('token')
+    );
+    
+    if (remainingAuthKeys.length === 0) {
+      console.log('Logout successful - All auth data cleared');
+      return true;
+    } else {
+      console.warn('Logout partially completed - Some keys could not be cleared:', remainingAuthKeys);
+      return true; // Still return true to continue with the flow
+    }
   } catch (error) {
     console.error('Logout error:', error);
-    throw error;
+    return false;
   }
 };
 

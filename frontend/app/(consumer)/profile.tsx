@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../utils/ThemeContext';
 import { API_CONFIG } from '../utils/config';
-import { getUserData, logoutUser, getAuthToken } from '../utils/auth';
+import { getAuthToken, logoutUser } from '../utils/auth';
 
 // Extended user type definition
 type ExtendedUser = {
@@ -101,41 +101,32 @@ export default function ProfileScreen() {
           email: data.user.email || '',
           phone: data.user.phone || '',
           role: data.user.role || 'consumer',
-          is_verified: Boolean(data.user.is_verified),
+          is_verified: data.user.is_verified || false,
           created_at: data.user.created_at || new Date().toISOString(),
-          profile_completed: Boolean(data.user.profile_completed)
+          profile_completed: data.user.profile_completed || false
         };
         
-        // Save updated data to storage
-        await AsyncStorage.setItem('user_data', JSON.stringify(userProfile));
-        
         setUser(userProfile);
+        
+        // Update stored user data
+        await AsyncStorage.setItem('user_data', JSON.stringify(userProfile));
       } else {
-        console.warn('API returned unsuccessful response:', data);
-        // Only fall back to local storage for server errors, not auth errors
-        if (response.status >= 500) {
-          // Fallback to local storage for server errors
-          const userData = await getUserData();
-          
-          if (userData) {
-            console.log('Using cached user data from local storage');
-            setUser(userData as ExtendedUser);
-          } else {
-            throw new Error(data.message || 'Failed to load profile');
-          }
-        } else {
-          throw new Error(data.message || 'Failed to load profile');
-        }
+        console.error('Failed to load profile:', data.message || 'Unknown error');
+        setError(data.message || 'Failed to load profile. Please try again.');
       }
-    } catch (error: any) {
-      console.error('Error loading user data:', error.message);
-      setError(error.message || 'Failed to load user data');
+    } catch (error) {
+      console.error('Error loading profile:', error);
+      setError('Failed to connect to server. Please check your internet connection and try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleLogout = async () => {
+  // Placeholder for any additional utility functions needed in the future
+  // This section was cleaned up to remove the aggressive emergency logout function 
+  // that was interfering with the standard logout flow
+
+  const handleLogout = () => {
     Alert.alert(
       'Log Out',
       'Are you sure you want to log out?',
@@ -149,30 +140,12 @@ export default function ProfileScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              console.log('Profile: Starting logout process...');
-              
-              // First clear AsyncStorage directly
-              const keys = await AsyncStorage.getAllKeys();
-              console.log('Profile: Found storage keys:', keys);
-              
-              // Clear all auth-related data
               await logoutUser();
-              
-              console.log('Profile: Auth data cleared, redirecting to sign-in');
-              
-              // Force navigation with a reset to clear history
-              router.navigate('/(auth)/sign-in');
-              
-              // Force a reload as a fallback if redirect doesn't work
-              setTimeout(() => {
-                console.log('Profile: Forcing navigation again...');
-                router.replace('/(auth)/sign-in');
-              }, 500);
+              router.replace('/(auth)/sign-in');
             } catch (error) {
-              console.error('Profile: Logout error:', error);
-              Alert.alert('Error', 'Failed to log out. Please try again.');
+              console.error('Logout error:', error);
             }
-          },
+          }
         },
       ]
     );
@@ -180,7 +153,8 @@ export default function ProfileScreen() {
 
   const handleThemeChange = (newTheme: 'light' | 'dark' | 'system') => {
     setCurrentTheme(newTheme);
-    setTheme(newTheme);
+    // Fix the TypeScript error by using the correct type
+    setTheme(newTheme === 'system' ? 'system' : newTheme);
   };
 
   const handleRefresh = () => {
@@ -195,10 +169,10 @@ export default function ProfileScreen() {
       return date.toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
-        day: 'numeric',
+        day: 'numeric'
       });
     } catch (error) {
-      return 'Invalid date';
+      return 'N/A';
     }
   };
 
@@ -207,7 +181,9 @@ export default function ProfileScreen() {
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.text }]}>Loading profile...</Text>
+          <Text style={[styles.loadingText, { color: colors.text }]}>
+            Loading profile...
+          </Text>
         </View>
       </SafeAreaView>
     );
@@ -217,8 +193,10 @@ export default function ProfileScreen() {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.errorContainer}>
-          <Ionicons name="alert-circle-outline" size={40} color={colors.error} />
-          <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
+          <Ionicons name="alert-circle-outline" size={60} color={colors.error} />
+          <Text style={[styles.errorText, { color: colors.text }]}>
+            {error}
+          </Text>
           <TouchableOpacity
             style={[styles.retryButton, { backgroundColor: colors.primary }]}
             onPress={handleRefresh}
@@ -249,32 +227,44 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
       </View>
-
+      
       <ScrollView 
+        style={{ flex: 1 }}
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        bounces={true}
       >
         {user && (
           <View style={[styles.userInfoContainer, { backgroundColor: colors.surface }]}>
             <View style={styles.avatarContainer}>
               <View style={[styles.avatar, { backgroundColor: colors.primary + '20' }]}>
-                <Ionicons name="person" size={40} color={colors.primary} />
+                <Text style={{ fontSize: 36, color: colors.primary }}>
+                  {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                </Text>
               </View>
               <View style={styles.userTextContainer}>
-                <Text style={[styles.nameText, { color: colors.text }]}>{user.name}</Text>
-                <Text style={[styles.emailText, { color: colors.textSecondary }]}>{user.email}</Text>
+                <Text style={[styles.nameText, { color: colors.text }]}>
+                  {user.full_name || user.name || 'User'}
+                </Text>
+                <Text style={[styles.emailText, { color: colors.textSecondary }]}>
+                  {user.email}
+                </Text>
                 {user.phone && (
-                  <Text style={[styles.phoneText, { color: colors.textSecondary }]}>{user.phone}</Text>
+                  <Text style={[styles.phoneText, { color: colors.textSecondary }]}>
+                    {user.phone}
+                  </Text>
                 )}
                 <View style={styles.statusContainer}>
-                  <Ionicons
-                    name={user.is_verified ? 'shield-checkmark' : 'alert-circle'}
-                    size={16}
-                    color={user.is_verified ? colors.success : colors.warning}
+                  <Ionicons 
+                    name={user.is_verified ? "checkmark-circle" : "time-outline"} 
+                    size={16} 
+                    color={user.is_verified ? '#4CAF50' : '#FFC107'} 
                   />
-                  <Text style={[styles.statusText, { color: user.is_verified ? colors.success : colors.warning }]}>
-                    {user.is_verified ? 'Verified Account' : 'Verification Pending'}
+                  <Text 
+                    style={[
+                      styles.statusText, 
+                      { color: user.is_verified ? '#4CAF50' : '#FFC107' }
+                    ]}
+                  >
+                    {user.is_verified ? 'Verified' : 'Pending Verification'}
                   </Text>
                 </View>
               </View>
@@ -282,7 +272,7 @@ export default function ProfileScreen() {
           </View>
         )}
 
-        {/* Theme Selection */}
+        {/* Appearance Settings */}
         <View style={[styles.section, { backgroundColor: colors.surface }]}>
           <View style={styles.sectionHeaderRow}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Appearance</Text>
@@ -293,88 +283,67 @@ export default function ProfileScreen() {
             <TouchableOpacity 
               style={[
                 styles.themeOption, 
-                currentTheme === 'light' ? [styles.selectedTheme, { borderColor: colors.primary, backgroundColor: colors.primary + '10' }] : { borderColor: colors.border }
+                { 
+                  backgroundColor: colors.background,
+                  borderColor: currentTheme === 'light' ? colors.primary : colors.border
+                },
+                currentTheme === 'light' && styles.selectedTheme
               ]}
               onPress={() => handleThemeChange('light')}
             >
-              <View style={styles.themeIconContainer}>
-                <Ionicons 
-                  name="sunny" 
-                  size={24} 
-                  color={currentTheme === 'light' ? colors.primary : colors.textSecondary} 
-                />
+              <View style={[styles.themeIconContainer, { backgroundColor: colors.primary + '15' }]}>
+                <Ionicons name="sunny-outline" size={22} color={colors.primary} />
               </View>
-              <Text 
-                style={[
-                  styles.themeText, 
-                  { color: currentTheme === 'light' ? colors.primary : colors.text }
-                ]}
-              >
-                Light
-              </Text>
-              {currentTheme === 'light' && 
-                <View style={[styles.checkmarkContainer, {backgroundColor: colors.primary}]}>
+              <Text style={[styles.themeText, { color: colors.text }]}>Light Mode</Text>
+              {currentTheme === 'light' && (
+                <View style={[styles.checkmarkContainer, { backgroundColor: colors.primary }]}>
                   <Ionicons name="checkmark" size={16} color="white" />
                 </View>
-              }
+              )}
             </TouchableOpacity>
             
             <TouchableOpacity 
               style={[
                 styles.themeOption, 
-                currentTheme === 'dark' ? [styles.selectedTheme, { borderColor: colors.primary, backgroundColor: colors.primary + '10' }] : { borderColor: colors.border }
+                { 
+                  backgroundColor: colors.background,
+                  borderColor: currentTheme === 'dark' ? colors.primary : colors.border
+                },
+                currentTheme === 'dark' && styles.selectedTheme
               ]}
               onPress={() => handleThemeChange('dark')}
             >
-              <View style={styles.themeIconContainer}>
-                <Ionicons 
-                  name="moon" 
-                  size={24} 
-                  color={currentTheme === 'dark' ? colors.primary : colors.textSecondary} 
-                />
+              <View style={[styles.themeIconContainer, { backgroundColor: colors.primary + '15' }]}>
+                <Ionicons name="moon-outline" size={22} color={colors.primary} />
               </View>
-              <Text 
-                style={[
-                  styles.themeText, 
-                  { color: currentTheme === 'dark' ? colors.primary : colors.text }
-                ]}
-              >
-                Dark
-              </Text>
-              {currentTheme === 'dark' && 
-                <View style={[styles.checkmarkContainer, {backgroundColor: colors.primary}]}>
+              <Text style={[styles.themeText, { color: colors.text }]}>Dark Mode</Text>
+              {currentTheme === 'dark' && (
+                <View style={[styles.checkmarkContainer, { backgroundColor: colors.primary }]}>
                   <Ionicons name="checkmark" size={16} color="white" />
                 </View>
-              }
+              )}
             </TouchableOpacity>
             
             <TouchableOpacity 
               style={[
                 styles.themeOption, 
-                currentTheme === 'system' ? [styles.selectedTheme, { borderColor: colors.primary, backgroundColor: colors.primary + '10' }] : { borderColor: colors.border }
+                { 
+                  backgroundColor: colors.background,
+                  borderColor: currentTheme === 'system' ? colors.primary : colors.border
+                },
+                currentTheme === 'system' && styles.selectedTheme
               ]}
               onPress={() => handleThemeChange('system')}
             >
-              <View style={styles.themeIconContainer}>
-                <Ionicons 
-                  name="phone-portrait" 
-                  size={24} 
-                  color={currentTheme === 'system' ? colors.primary : colors.textSecondary} 
-                />
+              <View style={[styles.themeIconContainer, { backgroundColor: colors.primary + '15' }]}>
+                <Ionicons name="phone-portrait-outline" size={22} color={colors.primary} />
               </View>
-              <Text 
-                style={[
-                  styles.themeText, 
-                  { color: currentTheme === 'system' ? colors.primary : colors.text }
-                ]}
-              >
-                System
-              </Text>
-              {currentTheme === 'system' && 
-                <View style={[styles.checkmarkContainer, {backgroundColor: colors.primary}]}>
+              <Text style={[styles.themeText, { color: colors.text }]}>System Default</Text>
+              {currentTheme === 'system' && (
+                <View style={[styles.checkmarkContainer, { backgroundColor: colors.primary }]}>
                   <Ionicons name="checkmark" size={16} color="white" />
                 </View>
-              }
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -447,15 +416,15 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Logout Button */}
-        <TouchableOpacity
-          style={[styles.logoutButton, { backgroundColor: colors.error + 'DD' }]}
-          onPress={handleLogout}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="log-out-outline" size={18} color="white" style={{marginRight: 8}} />
-          <Text style={styles.logoutButtonText}>Log Out</Text>
-        </TouchableOpacity>
+        {/* Logout Button - DIRECT IMPLEMENTATION */}
+       <TouchableOpacity
+                 style={styles.logoutButton}
+                 onPress={handleLogout}
+               >
+                 <Text style={styles.logoutButtonText}>
+                   Log Out
+                 </Text>
+               </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
@@ -663,16 +632,16 @@ const styles = StyleSheet.create({
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 4,
+    paddingVertical: 14,
     borderBottomWidth: 1,
   },
   infoIconContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.04)',
     marginRight: 12,
   },
   infoLabel: {
@@ -680,23 +649,24 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   infoValue: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '500',
   },
   accountTypeBadge: {
     paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingVertical: 4,
     borderRadius: 12,
   },
   accountTypeText: {
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 13,
+    fontWeight: '600',
   },
   supportRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 16,
-    marginBottom: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
   },
   supportIconContainer: {
     width: 40,
@@ -704,7 +674,8 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.04)',
+    marginRight: 12,
   },
   supportTextContainer: {
     flex: 1,
@@ -712,24 +683,24 @@ const styles = StyleSheet.create({
   supportTitle: {
     fontSize: 16,
     fontWeight: '500',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   supportDescription: {
     fontSize: 14,
+    opacity: 0.7,
   },
   logoutButton: {
-    flexDirection: 'row',
+    backgroundColor: '#e74c3c',
+    borderRadius: 8,
+    padding: 15,
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    marginHorizontal: 16,
-    marginTop: 24,
-    marginBottom: 40,
-    borderRadius: 12,
+    marginBottom: 30,
+    marginLeft: 20,
+    marginRight: 20
   },
   logoutButtonText: {
-    fontSize: 16,
+    color: '#fff',
+    fontSize: 18,
     fontWeight: '600',
-    color: 'white',
-  },
+  }
 });

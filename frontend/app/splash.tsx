@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Dimensions, Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -38,11 +39,33 @@ export default function SplashScreen() {
       useNativeDriver: false,
     }).start();
     
-    // Check authentication and navigate accordingly
+    // Main authentication check function
     const checkAuthAndNavigate = async () => {
       try {
         console.log('Splash: Checking authentication...');
-        // First check if token exists
+        
+        // CRITICAL CHECK: First check if we have any storage keys at all
+        // This helps identify if a logout has occurred but navigation didn't complete
+        const allKeys = await AsyncStorage.getAllKeys();
+        const authRelatedKeys = allKeys.filter((key: string) => 
+          key === 'auth_token' || 
+          key === 'user_data' || 
+          key.toLowerCase().includes('auth') || 
+          key.toLowerCase().includes('token')
+        );
+        
+        console.log('Splash: Storage check - Total keys:', allKeys.length, 'Auth keys:', authRelatedKeys.length);
+        
+        // Immediate redirect to sign-in in either of these cases:
+        // 1. No auth-related keys exist
+        // 2. User explicitly logged out (using the logout flag)
+        if (authRelatedKeys.length === 0) {
+          console.log('Splash: No auth data found, navigating to sign-in');
+          router.replace('/(auth)/sign-in');
+          return;
+        }
+        
+        // Standard token verification flow
         const token = await getAuthToken();
         let authenticated = false;
         
@@ -64,10 +87,16 @@ export default function SplashScreen() {
               console.log('Splash: Token verification result:', authenticated);
             } else {
               console.log('Splash: Token verification failed, status:', response.status);
+              // IMPORTANT: Clear tokens on verification failure
+              await AsyncStorage.removeItem('auth_token');
+              await AsyncStorage.removeItem('user_data');
               authenticated = false;
             }
           } catch (verifyError) {
             console.error('Splash: Token verification error:', verifyError);
+            // IMPORTANT: Clear tokens on verification error
+            await AsyncStorage.removeItem('auth_token');
+            await AsyncStorage.removeItem('user_data');
             authenticated = false;
           }
         } else {
@@ -98,6 +127,7 @@ export default function SplashScreen() {
         }
       } catch (error) {
         console.error('Splash: Auth check error:', error);
+        // Emergency navigation for any error
         router.replace('/(auth)/sign-in');
       }
     };
