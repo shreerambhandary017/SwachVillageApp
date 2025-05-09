@@ -41,6 +41,11 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     loadUserData();
+    
+    // Update document title to fix the localhost:8081/profile issue
+    if (typeof document !== 'undefined') {
+      document.title = 'Profile - Swach Village';
+    }
   }, []);
 
   useEffect(() => {
@@ -50,94 +55,78 @@ export default function ProfileScreen() {
   const loadUserData = async () => {
     try {
       setLoading(true);
+      setError('');
+      
       const token = await getAuthToken();
       
       if (!token) {
-        throw new Error('Authentication required');
+        console.error('No authentication token found');
+        router.replace('/(auth)/sign-in');
+        return;
       }
       
-      // First try to get user profile from the API
-      try {
-        console.log(`Fetching profile from: ${API_CONFIG.API_URL}/consumer/profile`);
+      console.log(`Fetching profile from: ${API_CONFIG.API_URL}/consumer/profile`);
+      
+      const response = await fetch(`${API_CONFIG.API_URL}/consumer/profile`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      console.log('API Response status:', response.status);
+      
+      // Handle HTTP status codes properly
+      if (response.status === 401 || response.status === 403) {
+        console.error('Authentication failed or expired');
+        // Clear invalid auth data
+        await logoutUser();
+        router.replace('/(auth)/sign-in');
+        return;
+      }
+      
+      // Get the response data
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        console.log('Successfully loaded user profile from API');
         
-        const response = await fetch(`${API_CONFIG.API_URL}/consumer/profile`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
+        // Map API response to ExtendedUser type
+        const userProfile: ExtendedUser = {
+          id: data.user.id,
+          name: data.user.name || '',
+          full_name: data.user.full_name || '',
+          email: data.user.email || '',
+          phone: data.user.phone || '',
+          role: data.user.role || 'consumer',
+          is_verified: Boolean(data.user.is_verified),
+          created_at: data.user.created_at || new Date().toISOString(),
+          profile_completed: Boolean(data.user.profile_completed)
+        };
+        
+        // Save updated data to storage
+        await AsyncStorage.setItem('user_data', JSON.stringify(userProfile));
+        
+        setUser(userProfile);
+      } else {
+        console.warn('API returned unsuccessful response:', data);
+        // Only fall back to local storage for server errors, not auth errors
+        if (response.status >= 500) {
+          // Fallback to local storage for server errors
+          const userData = await getUserData();
+          
+          if (userData) {
+            console.log('Using cached user data from local storage');
+            setUser(userData as ExtendedUser);
+          } else {
+            throw new Error(data.message || 'Failed to load profile');
           }
-        });
-        
-        console.log('API Response status:', response.status);
-        
-        // Get the response text first for debugging
-        const responseText = await response.text();
-        console.log('API Response text:', responseText);
-        
-        // Parse the response (if it's valid JSON)
-        let data;
-        try {
-          data = JSON.parse(responseText);
-        } catch (parseError) {
-          console.error('Failed to parse response as JSON:', parseError);
-          throw new Error('Invalid response format from server');
-        }
-        
-        if (response.ok && data.success) {
-          console.log('Successfully loaded user profile from API');
-          
-          // Ensure data.user conforms to our ExtendedUser type
-          const userProfile: ExtendedUser = {
-            id: data.user.id,
-            name: data.user.name || data.user.username || '',
-            full_name: data.user.full_name || '',
-            email: data.user.email || '',
-            phone: data.user.phone || '',
-            role: data.user.role || 'consumer',
-            is_verified: Boolean(data.user.is_verified),
-            created_at: data.user.created_at || new Date().toISOString(),
-            profile_completed: Boolean(data.user.profile_completed)
-          };
-          
-          // Save to storage for future use
-          await AsyncStorage.setItem('user_data', JSON.stringify(userProfile));
-          
-          setUser(userProfile);
-          return;
         } else {
-          console.warn('API returned unsuccessful response:', data);
-          throw new Error(data.message || 'Failed to load profile from server');
+          throw new Error(data.message || 'Failed to load profile');
         }
-      } catch (apiError: any) {
-        console.warn('API fetch failed, falling back to local storage:', apiError.message);
       }
-      
-      // Fallback to local storage if API fails
-      console.log('Attempting to get user data from local storage');
-      const userData = await getUserData();
-      
-      if (!userData) {
-        console.error('No user data found in local storage');
-        throw new Error('User data not available');
-      }
-      
-      console.log('Successfully loaded user data from local storage');
-      
-      // Ensure the stored user data matches our ExtendedUser type
-      const userFromStorage: ExtendedUser = {
-        id: userData.id,
-        name: userData.name || '',
-        full_name: userData.full_name || userData.name || '',
-        email: userData.email || '',
-        phone: userData.phone || '',
-        role: userData.role || 'consumer',
-        is_verified: Boolean(userData.is_verified),
-        created_at: userData.created_at || new Date().toISOString(),
-        profile_completed: Boolean(userData.profile_completed)
-      };
-      
-      setUser(userFromStorage);
     } catch (error: any) {
       console.error('Error loading user data:', error.message);
       setError(error.message || 'Failed to load user data');
@@ -160,13 +149,27 @@ export default function ProfileScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
+              console.log('Profile: Starting logout process...');
+              
+              // First clear AsyncStorage directly
+              const keys = await AsyncStorage.getAllKeys();
+              console.log('Profile: Found storage keys:', keys);
+              
+              // Clear all auth-related data
               await logoutUser();
-              // Force a small delay to ensure AsyncStorage updates complete
+              
+              console.log('Profile: Auth data cleared, redirecting to sign-in');
+              
+              // Force navigation with a reset to clear history
+              router.navigate('/(auth)/sign-in');
+              
+              // Force a reload as a fallback if redirect doesn't work
               setTimeout(() => {
+                console.log('Profile: Forcing navigation again...');
                 router.replace('/(auth)/sign-in');
-              }, 100);
+              }, 500);
             } catch (error) {
-              console.error('Logout error:', error);
+              console.error('Profile: Logout error:', error);
               Alert.alert('Error', 'Failed to log out. Please try again.');
             }
           },

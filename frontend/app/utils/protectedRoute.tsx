@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator, Text, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
-import { getUserData, isAuthenticated, UserRole } from './auth';
+import { getUserData, isAuthenticated, UserRole, getAuthToken } from './auth';
+import { API_CONFIG } from './config';
 
 // Interface for component props
 interface ProtectedRouteProps {
@@ -19,11 +20,24 @@ function ProtectedRouteComponent({ children, allowedRoles }: ProtectedRouteProps
     const checkAuth = async () => {
       try {
         setLoading(true);
+        console.log('ProtectedRoute: Checking authentication...');
         
-        // Check if user is authenticated
-        const authenticated = await isAuthenticated();
+        // Force a more thorough token verification instead of just checking if token exists
+        const verifyResponse = await fetch(`${API_CONFIG.API_URL}/auth/verify-token`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${await getAuthToken()}`
+          },
+        }).catch(err => {
+          console.error('Token verification network error:', err);
+          return { ok: false };
+        });
+        
+        // Check if user is authenticated with a valid token
+        const authenticated = await isAuthenticated() && verifyResponse?.ok;
         
         if (!authenticated) {
+          console.log('ProtectedRoute: Not authenticated, redirecting to sign-in');
           // Redirect to login if not authenticated
           router.replace('/(auth)/sign-in');
           return;
@@ -33,15 +47,19 @@ function ProtectedRouteComponent({ children, allowedRoles }: ProtectedRouteProps
         const userData = await getUserData();
         
         if (!userData) {
+          console.log('ProtectedRoute: No user data found, redirecting to sign-in');
           // Redirect to login if user data not found
           router.replace('/(auth)/sign-in');
           return;
         }
         
+        console.log('ProtectedRoute: User role:', userData.role, 'Allowed roles:', allowedRoles);
+        
         // Check if user role is in allowed roles
         if (allowedRoles.includes(userData.role)) {
           setAuthorized(true);
         } else {
+          console.log('ProtectedRoute: User role not in allowed roles, redirecting');
           // Redirect based on role
           if (userData.role === 'business') {
             router.replace('/(business)');

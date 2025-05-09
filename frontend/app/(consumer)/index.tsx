@@ -35,7 +35,10 @@ export default function ConsumerDashboard() {
       const token = await getAuthToken();
       
       if (!token) {
-        throw new Error('Authentication required');
+        // Redirect to login if not authenticated
+        console.log('No authentication token found, redirecting to login');
+        router.replace('/(auth)/sign-in');
+        return;
       }
       
       const response = await fetch(`${API_CONFIG.API_URL}/consumer/businesses`, {
@@ -45,6 +48,12 @@ export default function ConsumerDashboard() {
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          // Token is invalid or expired, redirect to login
+          console.log('Authentication token invalid or expired, redirecting to login');
+          router.replace('/(auth)/sign-in');
+          return;
+        }
         throw new Error('Failed to fetch businesses');
       }
 
@@ -52,6 +61,13 @@ export default function ConsumerDashboard() {
       setBusinesses(data.businesses || []);
     } catch (error) {
       console.error('Error fetching businesses:', error);
+      
+      // Check if error is authentication related
+      if (error instanceof Error && error.message === 'Authentication required') {
+        router.replace('/(auth)/sign-in');
+        return;
+      }
+      
       setError('Unable to load businesses. Please try again later.');
     } finally {
       setLoading(false);

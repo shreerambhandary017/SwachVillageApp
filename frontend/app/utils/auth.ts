@@ -122,7 +122,25 @@ export const verifyToken = async (): Promise<{ valid: boolean; user?: User }> =>
 
 export const logoutUser = async (): Promise<void> => {
   try {
+    console.log('Attempting to clear all auth data...');
+    
+    // Clear specific auth keys
     await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, USER_DATA_KEY]);
+    
+    // For more thorough cleanup, get all keys and remove any auth-related ones
+    const allKeys = await AsyncStorage.getAllKeys();
+    const additionalAuthKeys = allKeys.filter(key => 
+      key.toLowerCase().includes('auth') || 
+      key.toLowerCase().includes('token') || 
+      key.toLowerCase().includes('user')
+    );
+    
+    if (additionalAuthKeys.length > 0) {
+      console.log('Found additional auth keys to remove:', additionalAuthKeys);
+      await AsyncStorage.multiRemove(additionalAuthKeys);
+    }
+    
+    console.log('Auth data cleared successfully');
   } catch (error) {
     console.error('Logout error:', error);
     throw error;

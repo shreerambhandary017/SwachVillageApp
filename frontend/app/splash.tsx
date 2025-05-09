@@ -4,9 +4,10 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Svg, Circle, Path } from 'react-native-svg';
-import { isAuthenticated, getUserData } from './utils/auth';
+import { isAuthenticated, getUserData, getAuthToken } from './utils/auth';
 import { useTheme } from './utils/ThemeContext';
 import { THEME_SIZING } from './utils/theme';
+import { API_CONFIG } from './utils/config';
 
 export default function SplashScreen() {
   const router = useRouter();
@@ -40,13 +41,45 @@ export default function SplashScreen() {
     // Check authentication and navigate accordingly
     const checkAuthAndNavigate = async () => {
       try {
-        const authenticated = await isAuthenticated();
+        console.log('Splash: Checking authentication...');
+        // First check if token exists
+        const token = await getAuthToken();
+        let authenticated = false;
+        
+        // Only verify token if it exists
+        if (token) {
+          try {
+            // Verify the token with the backend
+            const response = await fetch(`${API_CONFIG.API_URL}/auth/verify-token`, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${token}`
+              },
+            });
+            
+            // Check if verification was successful
+            if (response.ok) {
+              const data = await response.json();
+              authenticated = data.valid;
+              console.log('Splash: Token verification result:', authenticated);
+            } else {
+              console.log('Splash: Token verification failed, status:', response.status);
+              authenticated = false;
+            }
+          } catch (verifyError) {
+            console.error('Splash: Token verification error:', verifyError);
+            authenticated = false;
+          }
+        } else {
+          console.log('Splash: No authentication token found');
+        }
         
         if (authenticated) {
           // Get user data to determine role
           const userData = await getUserData();
           
           if (userData) {
+            console.log('Splash: Authenticated as', userData.role);
             // Navigate based on user role
             if (userData.role === 'business') {
               router.replace('/(business)');
@@ -54,15 +87,17 @@ export default function SplashScreen() {
               router.replace('/(consumer)');
             }
           } else {
+            console.log('Splash: No user data found, redirecting to sign-in');
             // User data not found, go to sign-in
             router.replace('/(auth)/sign-in');
           }
         } else {
+          console.log('Splash: Not authenticated, redirecting to sign-in');
           // Not authenticated, go to sign-in
           router.replace('/(auth)/sign-in');
         }
       } catch (error) {
-        console.error('Auth check error:', error);
+        console.error('Splash: Auth check error:', error);
         router.replace('/(auth)/sign-in');
       }
     };

@@ -27,7 +27,7 @@ def get_user_feedback(user_id, role):
         feedback_items = []
         
         # First, check if the feedback table exists and what columns it has
-        cursor = db.cursor(dictionary=True)
+        cursor = db.cursor()
         
         try:
             # Get table structure
@@ -211,7 +211,7 @@ def get_user_profile(user_id, role):
             return jsonify({
                 'success': False,
                 'message': 'User ID is required'
-            }), 400
+            }), 401  # Use 401 for auth issues
 
         # Validate user_id is an integer
         try:
@@ -224,103 +224,47 @@ def get_user_profile(user_id, role):
             }), 400
 
         # Get database connection
-        try:
-            db = get_db()
-        except Exception as db_err:
-            print(f"Database connection error: {str(db_err)}")
-            return jsonify({
-                'success': False,
-                'message': 'Database connection error'
-            }), 500
-        
-        # Check users table structure
-        cursor = db.cursor(dictionary=True)
+        db = get_db()
+        cursor = db.cursor()
         
         try:
-            # Get table structure
-            cursor.execute("DESCRIBE users")
-            columns = {row['Field']: row for row in cursor.fetchall()}
-            print(f"Users table columns: {list(columns.keys())}")
-            
-            # Construct a query based on available columns
-            select_fields = ["id"]
-            
-            # Add other fields with COALESCE to handle NULL values
-            available_fields = {
-                'username': "COALESCE(username, '') as username",
-                'email': "COALESCE(email, '') as email",
-                'first_name': "COALESCE(first_name, '') as first_name",
-                'last_name': "COALESCE(last_name, '') as last_name",
-                'phone': "COALESCE(phone, '') as phone",
-                'full_name': "COALESCE(full_name, '') as full_name",
-                'role': "COALESCE(role, 'consumer') as role",
-                'created_at': "COALESCE(created_at, CURRENT_TIMESTAMP) as created_at",
-                'is_verified': "COALESCE(is_verified, 0) as is_verified"
-            }
-            
-            # Add existing columns to select clause
-            for col_name, col_expr in available_fields.items():
-                if col_name in columns:
-                    select_fields.append(col_expr)
-            
-            # Build the final query
-            query = f"""
-            SELECT
-                {', '.join(select_fields)}
+            # Simplified query - focus on essential fields
+            query = """
+            SELECT 
+                id, 
+                COALESCE(email, '') as email,
+                COALESCE(full_name, '') as full_name,
+                COALESCE(phone, '') as phone,
+                COALESCE(role, 'consumer') as role,
+                COALESCE(is_verified, 0) as is_verified,
+                COALESCE(created_at, CURRENT_TIMESTAMP) as created_at
             FROM users
-            WHERE id = %s
+            WHERE id = %s AND role = %s
             """
             
-            print(f"User profile query: {query}")
-            cursor.execute(query, (user_id,))
+            print(f"User profile query for ID: {user_id}, role: {role}")
+            cursor.execute(query, (user_id, role))
             user = cursor.fetchone()
             
             if not user:
-                print(f"User with ID {user_id} not found")
+                print(f"User with ID {user_id} and role {role} not found")
                 return jsonify({
                     'success': False,
-                    'message': 'User not found'
+                    'message': 'User not found or access denied'
                 }), 404
                 
             # Format date fields for JSON serialization
             if 'created_at' in user and user['created_at']:
                 user['created_at'] = user['created_at'].strftime('%Y-%m-%d %H:%M:%S')
-                
-            # Ensure all expected fields exist with defaults
-            default_fields = {
-                'id': user_id,
-                'username': 'user',
-                'email': '',
-                'first_name': '',
-                'last_name': '',
-                'full_name': '',
-                'phone': '',
-                'role': role or 'consumer',
-                'created_at': '',
-                'is_verified': 0
-            }
-
-            # Merge default fields with actual user data
-            for key, default_value in default_fields.items():
-                if key not in user or user[key] is None:
-                    user[key] = default_value
-
-            # Remove sensitive information
-            if 'password' in user or 'password_hash' in user:
-                user.pop('password', None)
-                user.pop('password_hash', None)
-
-            # Add a name field for convenience based on available name fields
-            if 'full_name' in user and user['full_name']:
-                user['name'] = user['full_name']
-            elif ('first_name' in user and user['first_name']) or ('last_name' in user and user['last_name']):
-                user['name'] = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip()
-            else:
-                user['name'] = user.get('username', 'User')
-
+            
+            # Set the name field
+            user['name'] = user.get('full_name', 'User')
+            
             # Ensure proper type conversion for boolean and numeric fields
             user['is_verified'] = bool(int(user.get('is_verified', 0)))
             user['id'] = int(user['id'])
+            
+            print(f"Successfully fetched user profile: {user['id']} - {user['name']}")
             
             return jsonify({
                 'success': True,
@@ -329,23 +273,12 @@ def get_user_profile(user_id, role):
             
         except Exception as query_err:
             print(f"Query error in profile: {str(query_err)}")
-            # Create a default user profile as fallback
-            default_user = {
-                'id': user_id,
-                'username': 'user',
-                'email': '',
-                'name': 'User',
-                'phone': '',
-                'role': role or 'consumer',
-                'created_at': '',
-                'is_verified': False
-            }
-            
+            # Return proper error status for database issues
             return jsonify({
-                'success': True,  # Return success with default data
-                'user': default_user,
+                'success': False,
+                'message': 'Failed to retrieve user profile', 
                 'error_details': str(query_err)
-            }), 200  # Return 200 to not break the frontend
+            }), 500  # Use 500 for server errors
         
         finally:
             if cursor:
@@ -353,23 +286,11 @@ def get_user_profile(user_id, role):
 
     except Exception as e:
         print(f"Critical profile error: {str(e)}")
-        # Return default user profile in case of critical error
-        default_user = {
-            'id': user_id if user_id else 0,
-            'username': 'user',
-            'email': '',
-            'name': 'User',
-            'phone': '',
-            'role': role or 'consumer',
-            'created_at': '',
-            'is_verified': False
-        }
-        
         return jsonify({
-            'success': True,  # Return success with default data
-            'user': default_user,
-            'error_message': 'An error occurred while fetching your profile.'
-        }), 200  # Return 200 to not break the frontend
+            'success': False,
+            'message': 'An error occurred while fetching your profile.',
+            'error_details': str(e)
+        }), 500  # Return proper error code
 
 @consumer_bp.route('/verify-product', methods=['POST'])
 @token_required(roles=['consumer'])
@@ -386,7 +307,7 @@ def verify_product(user_id, role):
             
         product_code = data.get('product_code') or data.get('barcode')
         db = get_db()
-        cursor = db.cursor(dictionary=True)
+        cursor = db.cursor()
         
         # Find the product
         query = """
@@ -442,7 +363,7 @@ def get_businesses():
         
         try:
             # Get total count
-            count_cursor = db.cursor(dictionary=True)
+            count_cursor = db.cursor()
             count_cursor.execute("SELECT COUNT(*) as count FROM businesses")
             result = count_cursor.fetchone()
             total_count = result['count'] if result else 0
@@ -461,7 +382,7 @@ def get_businesses():
             LIMIT %s OFFSET %s
             """
             
-            cursor = db.cursor(dictionary=True)
+            cursor = db.cursor()
             cursor.execute(query, (limit, offset))
             businesses = cursor.fetchall()
             cursor.close()
